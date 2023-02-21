@@ -167,56 +167,37 @@ pub contract Shapes {
 
         /*
             And now for the corresponding withdraw functions. These are tricky, mainly regarding the access control. For now they are limited to access(contract)
-            so that it can only be executed by an Admin resource.
+            so that it can only be executed by an Admin resource. Like before, its pointless to receive any inputs like an ID because either the shape exists,
+            or it does not. 
             TODO: These ones need extensive testing
         */
-        access(contract) fun withdrawSquare(squareID: UInt64): @Square {
+        access(contract) fun withdrawSquare(): @Square {
             pre {
                 self.mySquare == nil: "There are no Squares in this Collection. Cannot withdraw!"
             }
-
-            post {
-                result.id == squareID: "The Square IDs do not match! Cannot withdraw!"
-            }
         }
 
-        access(contract) fun withdrawTriangle(triangleID: UInt64): @Triangle {
+        access(contract) fun withdrawTriangle(): @Triangle {
             pre {
                 self.myTriangle == nil: "There are no Triangles in this Collection. Cannot withdraw!"
             }
-
-            post {
-                result.id == triangleID: "The Triangle IDs do not match! Cannot withdraw!"
-            }
         }
 
-        access(contract) fun withdrawPentagon(pentagonID: UInt64): @Pentagon {
+        access(contract) fun withdrawPentagon(): @Pentagon {
             pre {
                 self.myPentagon == nil: "There are no Pentagons in this Collection. Cannot withdraw!"
             }
-
-            post {
-                result.id == pentagonID: "The Pentagon IDs do not match! Cannot withdraw!"
-            }
         }
 
-        access(contract) fun withdrawCircle(circleID: UInt64): @Circle {
+        access(contract) fun withdrawCircle(): @Circle {
             pre {
                 self.myCircle == nil: "There are no Circles in this Collection. Cannot withdraw!"
             }
-
-            post {
-                result.id == circleID: "The Circles IDs do not match! Cannot withdraw!"
-            }
         }
 
-        access(contract) fun withdrawStar(starID: UInt64): @Star {
+        access(contract) fun withdrawStar(): @Star {
             pre {
                 self.myStar == nil: "There are no Stars in this Collection. Cannot withdraw!"
-            }
-
-            post {
-                result.id == starID: "The Stars IDs do not match! Cannot withdraw!"
             }
         }
 
@@ -230,6 +211,10 @@ pub contract Shapes {
         pub let id: UInt64
         pub let score: UInt64
         pub let nftCount: UInt64
+
+        pub fun getID(): UInt64 {
+            return self.id
+        }
 
         init(count: UInt64) {
             self.id = self.uuid
@@ -328,6 +313,124 @@ pub contract Shapes {
         pub fun depositStar(star: @Star): Void {
             self.score = self.score + star.score
             self.myStar <-! star
+        }
+
+        // The get id function checks each shape position and returns the id of the first one found. The assumption is that only one shape exists in the collection
+        // at a time, or none (which returns a nil)
+        pub fun getShapeID(): UInt64? {
+            if (self.mySquare != nil) {
+                // We don't/can't mess around with the stored resource, to get a reference to it intead
+                let squareRef: &Square = (&self.mySquare as &Square?)!
+
+                // And we can then return the id safely
+                return squareRef.id
+            }
+            
+            if (self.myTriangle != nil) {
+                let triangleRef: &Triangle = (&self.myTriangle as &Triangle?)!
+                return triangleRef.id
+            }
+
+            if (self.myPentagon != nil) {
+                let pentagonRef: &Pentagon = (&self.myPentagon as &Pentagon?)!
+                return pentagonRef.id
+            }
+
+            if (self.myCircle != nil) {
+                let circleRef: &Circle = (&self.myCircle as &Circle?)!
+                return circleRef.id
+            }
+
+            if (self.myStar != nil) {
+                let starRef: &Star = (&self.myStar as &Star?)!
+                return starRef.id
+            }
+
+            return nil
+        }
+
+        // Same logic for the following set of information retrieval functions
+        pub fun getShapeType(): Type? {
+            if (self.mySquare != nil) {
+                // In this case, because the getType() function is somewhat agnostic, we can return the type with needing to get a reference first
+                return self.mySquare.getType()
+            }
+
+            if (self.myTriangle != nil) {
+                return self.myTriangle.getType()
+            }
+
+            if (self.myPentagon != nil) {
+                return self.myPentagon.getType()
+            }
+
+            if (self.myCircle != nil) {
+                return self.myCircle.getType()
+            }
+
+            if (self.myStar != nil) {
+                return self.myStar.getType()
+            }
+
+            // If the code does not hit any of the previous ifs, return a nil isntead. It means that no shape is stored in this collection yet
+            return nil
+        }
+
+        // Just like the getType() function is not conditioned to a cast reference, so does the type's identifier
+        pub fun getShapeIdentifier(): String? {
+            if (self.mySquare != nil) {
+                return self.mySquare.getType().identifier
+            }
+
+            if (self.myTriangle != nil) {
+                return self.myTriangle.getType().identifier
+            }
+
+            if (self.myPentagon != nil) {
+                return self.myPentagon.getType().identifier
+            }
+
+            if (self.myCircle != nil) {
+                return self.myCircle.getType().identifier
+            }
+
+            if (self.myStar != nil) {
+                return self.myStar.getType().identifier
+            }
+
+            return nil
+        }
+
+        // And now for the borrow functions. These are the simpliest one. Just return the optional reference. Its up to the caller to check if these are nil or not
+        // There no need to go for the redundant process of checking if the shape exist first and all the casting process
+        pub fun borrowSquare(): &Square? {
+            return &self.mySquare as &Square?
+        }
+
+        pub fun borrowTriangle(): &Triangle? {
+            return &self.myTriangle as &Triangle?
+        }
+
+        pub fun borrowPentagon(): &Pentagon? {
+            return &self.myPentagon as &Pentagon?
+        }
+
+        pub fun borrowCircle(): &Circle? {
+            return &self.myCircle as &Circle?
+        }
+
+        pub fun borrowStar(): &Star? {
+            return &self.myStar as &Star?
+        }
+
+        // And the conditioned withdraw functions
+        access(contract) fun withdrawSquare(): @Square {
+            // As with the deposit functions, the pre conditions implemented in the Interface above take care of guaranteeing that a shape exists in the Collection
+            // If the code gets here, there is a shape in the variable in question
+            var squareToReturn: Never? = nil
+
+            squareToReturn <-> self.mySquare
+            return <- squareToReturn
         }
 
         init() {
