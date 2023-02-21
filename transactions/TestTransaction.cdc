@@ -10,6 +10,8 @@ transaction() {
 
         log("TestNFT type is ".concat(testNFT.getType().identifier))
 
+        log("TestNFT short type is ".concat(TestContract.getShortType(shapeType: testNFT.getType())))
+
         destroy testNFT
 
         log("Deployer address is ".concat(TestContract.returnDeployerAddress()))
@@ -19,3 +21,4 @@ transaction() {
 
     }
 }
+ 

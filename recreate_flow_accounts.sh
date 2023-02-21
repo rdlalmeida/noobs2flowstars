@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # The path to the transaction file used to create a new account
-CREATE_ACCOUNT_TRANSACTION_PATH=$HOME/Flow_projects/Flow_CLI_Tutorials/flow_cli_tutorials/flow/cadence/00/transactions/createAccount.cdc
+CREATE_ACCOUNT_TRANSACTION_PATH=$HOME/Flow_projects/common_resources/transactions/createAccount.cdc
 
 # Write down the public keys for the accounts to create (the corresponding private keys are already stored in flow.json but are set here for reference
 ACCOUNT01_PUBKEY=8e69871f04fdefd7932b606cde4b30b51398cca91b2c409ffd1f6f911de52cddecba67c759207a97581b5a1882a442124c69d773bf0e828f4d03a1860425cf39
