@@ -58,6 +58,9 @@ pub contract Shapes {
 
     // Event emited whenever a shape is deposited back to the contract 
     pub event ShapeWithdraw(id: UInt64, shapeType: String, from: Address?)
+
+    // Event emited whenever a new Collection is created
+    pub event CollectionCreated(to: Address?)
     //------------------------------------------------------------------------------
 
     //------------ CONTRACT INTERFACES ---------------------------------------------
@@ -66,6 +69,8 @@ pub contract Shapes {
         pub let id: UInt64
         pub let score: UInt64
 
+        // This one is used to keep tract of each shape in the same format as most collectible do, like 1/100, 177/200, etc.
+        pub let nftCount: UInt64
     }
 
     /*
@@ -80,6 +85,13 @@ pub contract Shapes {
         pub var myCircle: @Circle?
         pub var myStar: @Star?
 
+        // Implement a set of paths to store these collections in the user's account
+        pub let collectionStorage: StoragePath
+        pub let collectionPublic: PublicPath
+        
+        // The main score associated to the user, via its own Collection
+        pub var score: UInt64
+
         /*
             A way to establish control regarding maintaining a single Shape in this collection is to establish a dedicated deposit function per shape
             In that sense, to prevent the deposit of a new shape when one is already there, this function can return a shape back, which is simply the
@@ -88,14 +100,126 @@ pub contract Shapes {
         pub fun depositSquare(square: @Square): Void {
             pre {
                 // If there's a shape already there, the condition evaluates to false and returns the message
-                self.mySquare == nil: "There is a Square already stored this Collection! Cannot deposit another one!"
+                self.mySquare == nil: "There's a Square already stored this Collection! Cannot deposit another one!"
                 
                 // And this is how we can enforce only one shape per Collection. The deposit function can only occur when nothing is stored in the Collection
                 // to begin with. Also, this also implies that, in order to deposit another shape, the existing one needs to be withdraw first
                 self.myTriangle == nil && self.myPentagon == nil && self.myCircle == nil && self.myStar == nil: 
-                    "There is a shape already stored in this Collection! Cannot deposit another one!"
+                    "There is another shape already stored in this Collection! Cannot deposit another one!"
             }
         }
+
+        // The remaining ones are more of the same
+        pub fun depositTriangle(triangle: @Triangle): Void {
+            pre{
+                self.myTriangle == nil: "There's a Triangle already stored in this Collection! Cannot deposit another one!"
+
+                self.mySquare == nil && self.myPentagon == nil && self.myCircle == nil && self.myStar == nil:
+                    "There is another shape already stored in this Collection! Cannot deposit another one!"
+            }
+        }
+
+        pub fun depositPentagon(pentagon: @Pentagon): Void {
+            pre{
+                self.myPentagon == nil: "There's a Pentagon already stored in this Collection! Cannot deposit another one!"
+
+                self.mySquare == nil && self.myTriangle == nil && self.myCircle == nil && self.myStar == nil :
+                    "There is another shape already stored in this Collection! Cannot deposit another one!"
+            }
+        }
+
+        pub fun depositCircle(circle: @Circle): Void {
+            pre{
+                self.myCircle == nil: "There's a Circle already stored in this Collection! Cannot deposit another one!"
+
+                self.mySquare == nil && self.myTriangle == nil && self.myPentagon == nil && self.myStar == nil:
+                    "There is another shape already stored in this Collection! Cannot deposit another one!"
+            }
+        }
+
+        pub fun depositStar(star: @Star): Void {
+            pre{
+                self.myStar == nil: "There is a Star already stored in this Collection! Cannot deposit another one!"
+
+                self.mySquare == nil && self.myTriangle == nil && self.myPentagon == nil && self.myCircle == nil:
+                    "There is another shape already stored in this Collection! Cannot deposit another one!"
+            }
+        }
+
+        // Typical getID function, but this one reflects this context, i. e., the function returns a single ID for the shape stored in the collection,
+        // irregardless of the type of the shape itself, or nil if there are no shapes stored in it yet
+        pub fun getShapeID(): UInt64?
+
+        // Similar function to retrieve the type of the Shape stored. This one returns the Type itself, nil if no shapes are stored yet
+        pub fun getShapeType(): Type?
+
+        // And this one returns the String representation of the Type.
+        pub fun getShapeIdentifier(): String?
+
+        // Now we need a set of borrowNFT functions. But since each of these Collections only have one of five shapes, it is more efficient to borrow the
+        // shape reference by providing the shape type rather than the id. The functions returns a reference to the shpe or nil if no shapes are stored in
+        // the Collection yet
+        pub fun borrowSquare(): &Square?
+        pub fun borrowTriangle(): &Triangle?
+        pub fun borrowPentagon(): &Pentagon?
+        pub fun borrowCircle(): &Circle?
+        pub fun borrowStar(): &Star?
+
+        /*
+            And now for the corresponding withdraw functions. These are tricky, mainly regarding the access control. For now they are limited to access(contract)
+            so that it can only be executed by an Admin resource.
+            TODO: These ones need extensive testing
+        */
+        access(contract) fun withdrawSquare(squareID: UInt64): @Square {
+            pre {
+                self.mySquare == nil: "There are no Squares in this Collection. Cannot withdraw!"
+            }
+
+            post {
+                result.id == squareID: "The Square IDs do not match! Cannot withdraw!"
+            }
+        }
+
+        access(contract) fun withdrawTriangle(triangleID: UInt64): @Triangle {
+            pre {
+                self.myTriangle == nil: "There are no Triangles in this Collection. Cannot withdraw!"
+            }
+
+            post {
+                result.id == triangleID: "The Triangle IDs do not match! Cannot withdraw!"
+            }
+        }
+
+        access(contract) fun withdrawPentagon(pentagonID: UInt64): @Pentagon {
+            pre {
+                self.myPentagon == nil: "There are no Pentagons in this Collection. Cannot withdraw!"
+            }
+
+            post {
+                result.id == pentagonID: "The Pentagon IDs do not match! Cannot withdraw!"
+            }
+        }
+
+        access(contract) fun withdrawCircle(circleID: UInt64): @Circle {
+            pre {
+                self.myCircle == nil: "There are no Circles in this Collection. Cannot withdraw!"
+            }
+
+            post {
+                result.id == circleID: "The Circles IDs do not match! Cannot withdraw!"
+            }
+        }
+
+        access(contract) fun withdrawStar(starID: UInt64): @Star {
+            pre {
+                self.myStar == nil: "There are no Stars in this Collection. Cannot withdraw!"
+            }
+
+            post {
+                result.id == starID: "The Stars IDs do not match! Cannot withdraw!"
+            }
+        }
+
     }
     //------------------------------------------------------------------------------
 
@@ -104,54 +228,134 @@ pub contract Shapes {
     pub resource Square: INFT {
         // The usual id of the resource
         pub let id: UInt64
-
         pub let score: UInt64
+        pub let nftCount: UInt64
 
-        init() {
+        init(count: UInt64) {
             self.id = self.uuid
-            self.score = 1            
+            self.score = 1
+            self.nftCount = count
         }
     }
 
     pub resource Triangle: INFT {
         pub let id: UInt64
         pub let score: UInt64
+        pub let nftCount: UInt64
 
-        init() {
+        init(count: UInt64) {
             self.id = self.uuid
             self.score = 2
+            self.nftCount = count
         }
     }
 
     pub resource Pentagon: INFT {
         pub let id: UInt64
         pub let score: UInt64
+        pub let nftCount: UInt64
 
-        init() {
+        init(count: UInt64) {
             self.id = self.uuid
             self.score = 3
+            self.nftCount = count
         }
     }
 
     pub resource Circle: INFT {
         pub let id: UInt64
         pub let score: UInt64
+        pub let nftCount: UInt64
 
-        init() {
+        init(count: UInt64) {
             self.id = self.uuid
             self.score = 4
+            self.nftCount = count
         }
     }
 
     pub resource Star: INFT {
         pub let id: UInt64
         pub let score: UInt64
+        pub let nftCount: UInt64
 
-        init() {
+        init(count: UInt64) {
             self.id = self.uuid
             self.score = 5
+            self.nftCount = count
         }
     }
+
+    pub resource Collection: ICollection {
+        pub var mySquare: @Square?
+        pub var myTriangle: @Triangle?
+        pub var myPentagon: @Pentagon?
+        pub var myCircle: @Circle?
+        pub var myStar: @Star?
+
+        pub let collectionStorage: StoragePath
+        pub let collectionPublic: PublicPath
+
+        pub var score: UInt64
+
+        // Now the deposit functions
+        pub fun depositSquare(square: @Square): Void {
+            // The mechanics to ensure that only one Square (or any other shape) are in this collection at a time were defined in the interface above.
+            // At this point we need only to store the shape received in the correct place in the Collection
+            
+            // Update the collection score with the one received by the shape input
+            self.score = self.score + square.score
+
+            // And store it internally first
+            self.mySquare <-! square
+        }
+
+        pub fun depositTriangle(triangle: @Triangle): Void {
+            self.score = self.score + triangle.score
+            self.myTriangle <-! triangle
+        }
+
+        pub fun depositPentagon(pentagon: @Pentagon): Void {
+            self.score = self.score + pentagon.score
+            self.myPentagon <-! pentagon
+        }
+
+        pub fun depositCircle(circle: @Circle): Void {
+            self.score = self.score + circle.score
+            self.myCircle <-! circle
+        }
+
+        pub fun depositStar(star: @Star): Void {
+            self.score = self.score + star.score
+            self.myStar <-! star
+        }
+
+        init() {
+            // Initialize all inner shapes to nil. These can only get here from a Admin transfer
+            self.mySquare <- nil
+            self.myTriangle <- nil
+            self.myPentagon <- nil
+            self.myCircle <- nil
+            self.myStar <- nil
+
+            self.collectionStorage = /storage/ShapeCollection
+            self.collectionPublic = /public/ShapeCollection
+
+            // Score initialized at 0, as expected
+            self.score = 0
+        }
+
+        // The usual destructor
+        destroy() {
+            destroy self.mySquare
+            destroy self.myTriangle
+            destroy self.myPentagon
+            destroy self.myCircle
+            destroy self.myStar
+        }
+    }
+
+    // And now for the main Collection resource, which follows the interface defined above
     //------------------------------------------------------------------------------
     
     //------------ CONTRACT FUNCTIONS ----------------------------------------------
@@ -170,6 +374,11 @@ pub contract Shapes {
         // Use the length of the piece to remove to slice the type String
 
         return longType.slice(from: pieceToRemove.length,  upTo: longType.length)
+    }
+
+    // The usual function to create an empty collection
+    pub fun createEmptyCollection(): @Collection {
+        return <- create Collection()
     }
     //------------------------------------------------------------------------------
     
