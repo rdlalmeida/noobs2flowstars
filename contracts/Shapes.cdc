@@ -36,6 +36,13 @@ pub contract Shapes {
     pub var starTotalSupply: UInt64
     pub let maxStars: UInt64
 
+    // Set the storage paths at the root of the contract too
+    pub let collectionStorage: StoragePath
+    pub let collectionPublic: PublicPath
+
+    pub let adminStorage: StoragePath
+    pub let adminPrivate: PrivatePath
+
     /*
         Dictionaries to store the minted shapes for future distribution
         NOTE 1: We can keep note of how many shapes are "out there", i.e., transferred for external accounts by subtracting the
@@ -81,6 +88,9 @@ pub contract Shapes {
 
     // Event emited when the Admin Resource is created, saved and linked to the private storage
     pub event AdminReady()
+
+    // Event emited when a Collection is upgraded
+    pub event CollectionUpgraded(from: String, to: String, account: Address?)
     //------------------------------------------------------------------------------
 
     //------------ CONTRACT INTERFACES ---------------------------------------------
@@ -104,10 +114,6 @@ pub contract Shapes {
         pub var myPentagon: @[Shapes.Pentagon]
         pub var myCircle: @[Shapes.Circle]
         pub var myStar: @[Shapes.Star]
-
-        // Implement a set of paths to store these collections in the user's account
-        pub let collectionStorage: StoragePath
-        pub let collectionPublic: PublicPath
         
         // The main score associated to the user, via its own Collection
         pub var score: UInt64
@@ -186,7 +192,7 @@ pub contract Shapes {
         pub fun borrowStar(): &Shapes.Star?
 
         /*
-            And now for the corresponding withdraw functions. These are tricky, mainly regarding the access control. For now they are limited to access(contract)
+            And now for the corresponding withdraw functions. These are tricky, mainly regarding the access control. For now they are limited to access(account)
             so that it can only be executed by an Admin resource. Like before, its pointless to receive any inputs like an ID because either the shape exists,
             or it does not.
             This interface check if there a shape in the collection first (if the condition is true, i.e., the length of the array is indeed 0) before attempting to
@@ -194,9 +200,9 @@ pub contract Shapes {
             to be either empty or with only one shape at any moment, at most.
             TODO: These ones need extensive testing
         */
-        access(contract) fun withdrawSquare(): @Shapes.Square {
+        access(account) fun withdrawSquare(): @Shapes.Square {
             pre {
-                self.mySquare.length == 0: "There are no Squares in this Collection. Cannot withdraw!"
+                self.mySquare.length == 1: "The number of Squares in this Collection is not 1. Cannot withdraw!"
             }
 
             post {
@@ -204,9 +210,9 @@ pub contract Shapes {
             }
         }
 
-        access(contract) fun withdrawTriangle(): @Shapes.Triangle {
+        access(account) fun withdrawTriangle(): @Shapes.Triangle {
             pre {
-                self.myTriangle.length == 0: "There are no Triangles in this Collection. Cannot withdraw!"
+                self.myTriangle.length == 1: "The number of Triangles in this Collection is not 1. Cannot withdraw!"
             }
 
             post {
@@ -214,9 +220,9 @@ pub contract Shapes {
             }
         }
 
-        access(contract) fun withdrawPentagon(): @Shapes.Pentagon {
+        access(account) fun withdrawPentagon(): @Shapes.Pentagon {
             pre {
-                self.myPentagon.length == 0: "There are no Pentagons in this Collection. Cannot withdraw!"
+                self.myPentagon.length == 1: "The number of Pentagons in this Collection is not 1. Cannot withdraw!"
             }
 
             post {
@@ -224,9 +230,9 @@ pub contract Shapes {
             }
         }
 
-        access(contract) fun withdrawCircle(): @Shapes.Circle {
+        access(account) fun withdrawCircle(): @Shapes.Circle {
             pre {
-                self.myCircle.length == 0: "There are no Circles in this Collection. Cannot withdraw!"
+                self.myCircle.length == 1: "The number of Circles in this Collection is not 1. Cannot withdraw!"
             }
 
             post {
@@ -234,9 +240,9 @@ pub contract Shapes {
             }
         }
 
-        access(contract) fun withdrawStar(): @Shapes.Star {
+        access(account) fun withdrawStar(): @Shapes.Star {
             pre {
-                self.myStar.length == 0: "There are no Stars in this Collection. Cannot withdraw!"
+                self.myStar.length == 1: "The number of Stars in this Collection is not 1. Cannot withdraw!"
             }
 
             post {
@@ -254,10 +260,6 @@ pub contract Shapes {
         pub let id: UInt64
         pub let score: UInt64
         pub let nftCount: UInt64
-
-        pub fun getID(): UInt64 {
-            return self.id
-        }
 
         init(count: UInt64) {
             self.id = self.uuid
@@ -321,9 +323,6 @@ pub contract Shapes {
         pub var myPentagon: @[Shapes.Pentagon]
         pub var myCircle: @[Shapes.Circle]
         pub var myStar: @[Shapes.Star]
-
-        pub let collectionStorage: StoragePath
-        pub let collectionPublic: PublicPath
 
         pub var score: UInt64
 
@@ -448,46 +447,96 @@ pub contract Shapes {
         // And now for the borrow functions. These are the simpliest one. Just return the optional reference. Its up to the caller to check if these are nil or not
         // There no need to go for the redundant process of checking if the shape exist first and all the casting process
         pub fun borrowSquare(): &Shapes.Square? {
-            return &self.mySquare[0] as &Square?
+            if (self.mySquare.length != 0) {
+                return &self.mySquare[0] as &Shapes.Square
+            }
+            
+            return nil
         }
 
         pub fun borrowTriangle(): &Shapes.Triangle? {
-            return &self.myTriangle[0] as &Triangle?
+            if (self.myTriangle.length != 0) {
+                return &self.myTriangle[0] as &Triangle
+            }
+            return nil
         }
 
         pub fun borrowPentagon(): &Shapes.Pentagon? {
-            return &self.myPentagon[0] as &Pentagon?
+            if (self.myPentagon.length != 0) {
+                return &self.myPentagon[0] as &Pentagon
+            }
+            return nil
         }
 
         pub fun borrowCircle(): &Shapes.Circle? {
-            return &self.myCircle[0] as &Circle?
+            if (self.myCircle.length != 0) {
+                return &self.myCircle[0] as &Circle
+            }
+            return nil
         }
 
         pub fun borrowStar(): &Shapes.Star? {
-            return &self.myStar[0] as &Star?
+            if (self.myStar.length != 0) {
+                return &self.myStar[0] as &Star
+            }
+            return nil
         }
 
         // And the conditioned withdraw functions
-        access(contract) fun withdrawSquare(): @Shapes.Square {
+        access(account) fun withdrawSquare(): @Shapes.Square {
             // As with the deposit functions, the pre conditions implemented in the Interface above take care of guaranteeing that a shape exists in the Collection
             // If the code gets here, there is a shape in the variable in question
             return <- self.mySquare.remove(at: 0)
         }
 
-        access(contract) fun withdrawTriangle(): @Shapes.Triangle {
+        access(account) fun withdrawTriangle(): @Shapes.Triangle {
             return <- self.myTriangle.remove(at: 0)
         }
 
-        access(contract) fun withdrawPentagon(): @Shapes.Pentagon {
+        access(account) fun withdrawPentagon(): @Shapes.Pentagon {
             return <- self.myPentagon.remove(at: 0)
         }
 
-        access(contract) fun withdrawCircle(): @Shapes.Circle {
+        access(account) fun withdrawCircle(): @Shapes.Circle {
             return <- self.myCircle.remove(at: 0)
         }
 
-        access(contract) fun withdrawStar(): @Shapes.Star {
+        access(account) fun withdrawStar(): @Shapes.Star {
             return <- self.myStar.remove(at:0)
+        }
+
+        /*
+            Function to validate a Collection, namely, by returning the number of shapes in it, regardless of the type. A valid Collection should have either
+            0 or 1 shape at all times. The actual validation should happen after (in a transaction for instance), that checks if the Int returned is what is
+            expected
+
+            input: None - The function uses the self reference to get the neccessary data
+            output: Int - The 
+        */
+        pub fun getShapeCount(): Int {
+            let squareNumber: Int = self.mySquare.length
+            let triangleNumber: Int = self.myTriangle.length
+            let pentagonNumber: Int = self.myPentagon.length
+            let circleNumber: Int = self.myCircle.length
+            let starNumber: Int = self.myStar.length
+
+            return (squareNumber + triangleNumber + pentagonNumber + circleNumber + starNumber)
+        }
+
+        /*
+            Function to return the state of emptyness of a Collection. It uses the previous function that returns the shape count function above
+            input: None - The function calls the getShapeCount() that does not needs an input as well
+            output: Bool - True or False regarding the answer to the question
+        */
+        pub fun isEmpty(): Bool {
+            let shapeCount: Int = self.getShapeCount()
+
+            if(shapeCount == 0) {
+                return true
+            }
+            else {
+                return false
+            }
         }
 
         init() {
@@ -497,9 +546,6 @@ pub contract Shapes {
             self.myPentagon <- []
             self.myCircle <- []
             self.myStar <- []
-
-            self.collectionStorage = /storage/ShapeCollection
-            self.collectionPublic = /public/ShapeCollection
 
             // Score initialized at 0, as expected
             self.score = 0
@@ -525,9 +571,6 @@ pub contract Shapes {
         Another approach was to create a Admin Collection that could store multiple NFTs as opposed to the user ones.
     */
     pub resource Admin {
-        pub let adminStorage: StoragePath
-        pub let adminPrivate: PrivatePath
-
         /*
             The most important functions here are the deposit and withdraw functions
             As with most up to here, the deposit function is actually a series of deposit functions, one per shape, to keep it simple, believe it or not
@@ -538,9 +581,9 @@ pub contract Shapes {
             output: Void. If the pre-condition is not triggered, the function is successful
         */
         
-        access(contract) fun depositSquare(collectionRef: &Shapes.Collection): Void {
+        pub fun depositSquare(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedSquares.length == 0: "There are no Squares left to deposit! Cannot continue!"
+                Shapes.ownedSquares.length != 0: "There are no Squares left to deposit! Cannot continue!"
             }
             // If the pre-condition cleared, retrieve the next available Square and deposit it in the Collection provided
             let squareToDeposit: @Shapes.Square <- Shapes.ownedSquares.remove(key: Shapes.getAllSquareIDs().removeFirst())!
@@ -550,36 +593,36 @@ pub contract Shapes {
         }
 
         // The remaining ones are the same
-        access(contract) fun depositTriangle(collectionRef: &Shapes.Collection): Void {
+        pub fun depositTriangle(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedTriangles.length == 0: "There are no Triangles left to deposit! Cannot continue!"
+                Shapes.ownedTriangles.length != 0: "There are no Triangles left to deposit! Cannot continue!"
             }
 
             let triangleToDeposit: @Shapes.Triangle <- Shapes.ownedTriangles.remove(key: Shapes.getAllTriangleIDs().removeFirst())!
             collectionRef.depositTriangle(triangle: <- triangleToDeposit)
         }
 
-        access(contract) fun depositPentagon(collectionRef: &Shapes.Collection): Void {
+        pub fun depositPentagon(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedPentagons.length == 0: "There are no Pentagons left to deposit! Cannot continue!"
+                Shapes.ownedPentagons.length != 0: "There are no Pentagons left to deposit! Cannot continue!"
             }
 
             let pentagonToDeposit: @Shapes.Pentagon <- Shapes.ownedPentagons.remove(key: Shapes.getAllPentagonIDs().removeFirst())!
             collectionRef.depositPentagon(pentagon: <- pentagonToDeposit)
         }
 
-        access(contract) fun depositCircle(collectionRef: &Shapes.Collection): Void {
+        pub fun depositCircle(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedCircles.length == 0: "There are no Circles left to deposit! Cannot continue!"
+                Shapes.ownedCircles.length != 0: "There are no Circles left to deposit! Cannot continue!"
             }
 
             let circleToDeposit: @Shapes.Circle <- Shapes.ownedCircles.remove(key: Shapes.getAllCircleIDs().removeFirst())!
             collectionRef.depositCircle(circle: <- circleToDeposit)
         }
 
-        access(contract) fun depositStar(collectionRef: &Shapes.Collection): Void {
+        pub fun depositStar(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedStars.length == 0: "There are no Stars left to deposit! Cannot continue!"
+                Shapes.ownedStars.length != 0: "There are no Stars left to deposit! Cannot continue!"
             }
 
             let starToDeposit: @Shapes.Star <- Shapes.ownedStars.remove(key: Shapes.getAllStarIDs().removeFirst())!
@@ -600,10 +643,10 @@ pub contract Shapes {
             input: &Shapes.Collection - A reference to a Collection reference for the user from where the shape is to be retrieved from
             output: Void - The function assumes that, if none of the pre or post conditions are violated, the withdrawl is successful.
         */
-        access(contract) fun withdrawSquare(collectionRef: &Shapes.Collection): Void {
+        pub fun withdrawSquare(collectionRef: &Shapes.Collection): Void {
             pre {
-                // Check if the length of the internal dictionary matches the max Squares allowed, which means that no more Squares can be stores in this dictionary.
-                Shapes.ownedSquares.length == Int(Shapes.maxSquares): "This contract cannot store any more Squares! Cannot proceed!"
+                // Check if the length of the internal dictionary matches the max Squares allowed, which means that no more Squares can be stored in this dictionary.
+                Shapes.ownedSquares.length < Int(Shapes.maxSquares): "This contract cannot store any more Squares! Cannot proceed!"
             }
             // Attempt to withdraw the shape from the user Collection. If there are no squares there or any other issues, the pre and post conditions of the withdraw
             // function should stop it in their tracks
@@ -619,9 +662,9 @@ pub contract Shapes {
             destroy oldResource
         }
 
-        access(contract) fun withdrawTriangle(collectionRef: &Shapes.Collection): Void {
+        pub fun withdrawTriangle(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedTriangles.length == Int(Shapes.maxTriangles): "This contract cannot store any more Triangles! Cannot proceed!"
+                Shapes.ownedTriangles.length < Int(Shapes.maxTriangles): "This contract cannot store any more Triangles! Cannot proceed!"
             }
 
             let triangleToRetrieve: @Shapes.Triangle <- collectionRef.withdrawTriangle()
@@ -629,9 +672,9 @@ pub contract Shapes {
             destroy oldResource
         }
 
-        access(contract) fun withdrawPentagon(collectionRef: &Shapes.Collection): Void {
+        pub fun withdrawPentagon(collectionRef: &Shapes.Collection): Void {
             pre{
-                Shapes.ownedPentagons.length == Int(Shapes.maxPentagons): "This contract cannot store any more Pentagons! Cannot proceed!"
+                Shapes.ownedPentagons.length < Int(Shapes.maxPentagons): "This contract cannot store any more Pentagons! Cannot proceed!"
             }
 
             let pentagonToRetrieve: @Shapes.Pentagon <- collectionRef.withdrawPentagon()
@@ -639,9 +682,9 @@ pub contract Shapes {
             destroy oldResource
         }
 
-        access(contract) fun withdrawCircle(collectionRef: &Shapes.Collection): Void {
+        pub fun withdrawCircle(collectionRef: &Shapes.Collection): Void {
             pre {
-                Shapes.ownedCircles.length == Int(Shapes.maxCircles): "This contract cannot store any more Circles! Cannot proceed!"
+                Shapes.ownedCircles.length < Int(Shapes.maxCircles): "This contract cannot store any more Circles! Cannot proceed!"
             }
 
             let circleToRetrieve: @Shapes.Circle <- collectionRef.withdrawCircle()
@@ -649,9 +692,9 @@ pub contract Shapes {
             destroy oldResource
         }
 
-        access(contract) fun withdrawStar(collectionRef: &Shapes.Collection): Void {
+        pub fun withdrawStar(collectionRef: &Shapes.Collection): Void {
             pre{
-                Shapes.ownedStars.length == Int(Shapes.maxStars): "This contract cannot store any more Stars! Cannot proceed!"
+                Shapes.ownedStars.length < Int(Shapes.maxStars): "This contract cannot store any more Stars! Cannot proceed!"
             }
 
             let starToRetrieve: @Shapes.Star <- collectionRef.withdrawStar()
@@ -659,9 +702,89 @@ pub contract Shapes {
             destroy oldResource
         }
 
+        /*
+            Function to upgrade a user Collection. This function receives a Collection, checks if the Collection has a shape in it and its not a Star (because
+            you cannot upgrade it further) and switches it for the next shape in the sequence Square -> Triangle -> Pentagon -> Circle -> Star
+            
+            input: &Shapes.Collection - a reference for a user Collection
+            output: Void
+
+            The function does not returns anything. As usual, pre and post conditions are used to prevent illegal operations
+        */
+        pub fun upgradeCollection(collectionRef: &Shapes.Collection): Void {
+            pre {
+                // One single pre condition should be enough to detect if a collection is upgradable: check if the Square, Triangle, Pentagon and Circle are all empty
+                // If that it is the case, the Collection is either empty or has only a Star in it. In either case it is not upgradable
+                (collectionRef.myStar.length == 0) && (!collectionRef.isEmpty()):
+                    "The Collection is not upgradable. Its either Empty or has a Star already. Cannot upgrade!"
+            }
+            // If we get here, there is a shape somewhere. Detect where it is and proceed accordingly
+            if (collectionRef.mySquare.length != 0) {
+                // The collection is at Square level. Upgrade it to a Triangle
+                // Start by withdraw it back to the contract storage first. Because we need at least one Triangle to deposit afterwards, first check if there is one available
+                // at least before continuing
+                if (Shapes.ownedTriangles.length == 0) {
+                    panic("Unable to upgrade Collection from account ".concat(self.owner?.address?.toString()!).concat(". The Collection has a Square and there are no Triangles left!"))
+                }
+
+                // There are Triangles left and he upgrade process can continue. From here is just a matter of calling the proper functions
+                self.withdrawSquare(collectionRef: collectionRef)
+                self.depositTriangle(collectionRef: collectionRef)
+
+                // Emit the corresponding event
+                emit Shapes.CollectionUpgraded(from: "Square", to: "Triangle", account: self.owner?.address)
+
+                // Do a return Void to prevent the next ifs from running
+                return
+            }
+
+            // The rest is more of the same
+            if (collectionRef.myTriangle.length != 0) {
+                if(Shapes.ownedPentagons.length == 0) {
+                    panic("Unable to upgrade Collection from account ".concat(self.owner?.address?.toString()!).concat(". The Collection has a Triangle and there are no Pentagons left!"))
+                }
+                self.withdrawTriangle(collectionRef: collectionRef)
+                self.depositPentagon(collectionRef: collectionRef)
+
+                emit Shapes.CollectionUpgraded(from: "Triangle", to: "Pentagon", account: self.owner?.address)
+
+                return
+            }
+
+            if (collectionRef.myPentagon.length != 0) {
+                if(Shapes.ownedCircles.length == 0) {
+                    panic("Unable to upgrade Collection from account ".concat(self.owner?.address?.toString()!).concat(". The Collection has a Pentagon and there are no Circles left!"))
+                }
+                self.withdrawPentagon(collectionRef: collectionRef)
+                self.depositCircle(collectionRef: collectionRef)
+
+                emit Shapes.CollectionUpgraded(from: "Pentagon", to: "Circle", account: self.owner?.address)
+
+                return
+            }
+
+            // The last case is the default. There's no need to do an if here
+            if (Shapes.ownedStars.length == 0) {
+                panic("Unable to upgrade Collection from account ".concat(self.owner?.address?.toString()!).concat(". The Collection has a Circle and there are no Stars left!"))
+            }
+            self.withdrawCircle(collectionRef: collectionRef)
+            self.depositStar(collectionRef: collectionRef)
+
+            emit Shapes.CollectionUpgraded(from: "Circle", to: "Star", account: self.owner?.address)
+        }
+
+        /* 
+            Function to jump start a Collection, which essentially consists in depositing a Square into it (after payment or some sort of indication from the front end)
+            
+            input: &Shapes.Collection - A reference to a shape collection to jump start
+            output: Void
+        */
+        pub fun jumpStartCollection(collectionRef: &Shapes.Collection) {
+            // The only pre condition is that there's a Square in the contract to deposit. But the Admin deposit function already does this, so, go for it
+            self.depositSquare(collectionRef: collectionRef)
+        }
+
         init () {
-            self.adminStorage = /storage/ShapeAdmin
-            self.adminPrivate = /private/ShapeAdmin
         }
 
         /*
@@ -788,13 +911,25 @@ pub contract Shapes {
         self.ownedCircles <- {}
         self.ownedStars <- {}
 
+        // Set the storage paths
+        self.collectionStorage = /storage/ShapeCollection
+        self.collectionPublic = /public/ShapeCollection
+
+        self.adminStorage = /storage/AdminStorage
+        self.adminPrivate = /private/AdminStorage
+
+        // ----------------------------- TEST BLOCK - REMOVE IN PROD ----------------------
+        let randomAdmin: @AnyResource <- self.account.load<@AnyResource>(from: self.adminStorage)
+        destroy randomAdmin
+
+        self.account.unlink(self.adminPrivate)
+        // --------------------------------------------------------------------------------
+
         // Create, save and link an Admin resource to the private storage
         let admin: @Shapes.Admin <- create Admin()
 
-        // The storage paths are saved into the resource itself. Keep a reference to it just access them after saving it to private storage
-        let adminRef: &Shapes.Admin = &admin as &Shapes.Admin
-        self.account.save(<- admin, to: adminRef.adminStorage)
-        self.account.link<&Shapes.Admin>(adminRef.adminPrivate, target: adminRef.adminStorage)
+        self.account.save(<- admin, to: self.adminStorage)
+        self.account.link<&Shapes.Admin>(self.adminPrivate, target: self.adminStorage)
 
         // Admin is ready. Emit the event to notify people
         emit self.AdminReady()
@@ -816,7 +951,7 @@ pub contract Shapes {
 
         // Now the triangles
         // Reset the counter first
-        counter = 0
+        counter = 1
 
         while (counter <= self.maxTriangles) {
             let newTriangle: @Shapes.Triangle <- create Triangle(count: counter)
@@ -828,7 +963,7 @@ pub contract Shapes {
         emit AllTrianglesMinted(amount: counter)
 
         // Pentagons
-        counter = 0
+        counter = 1
 
         while (counter <= self.maxPentagons) {
             let newPentagon: @Shapes.Pentagon <- create Pentagon(count: counter)
@@ -840,7 +975,7 @@ pub contract Shapes {
         emit AllPentagonsMinted(amount: counter)
 
         // Circles
-        counter = 0
+        counter = 1
 
         while (counter <= self.maxCircles) {
             let newCircle: @Shapes.Circle <- create Circle(count: counter)
@@ -852,7 +987,7 @@ pub contract Shapes {
         emit AllCirclesMinted(amount: counter)
 
         // Stars
-        counter = 0
+        counter = 1
         
         while (counter <= self.maxStars) {
             let newStar: @Shapes.Star <- create Star(count: counter)
