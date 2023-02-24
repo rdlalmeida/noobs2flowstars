@@ -7,21 +7,59 @@
 	},
 	"contracts": {
 		"NonFungibleToken": {
-			"source": "../common_resources/contracts/NonFungibleToken.cdc",
+			"source": "../float/src/cadence/core-contracts/NonFungibleToken.cdc",
 			"aliases": {
-				"emulator": "0xf8d6e0586b0a20c7"
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x631e88ae7f1d7c20",
+				"mainnet": "0x1d7e57aa55817448"
 			}
 		},
 		"FungibleToken": {
-			"source": "../common_resources/contracts/FungibleToken.cdc",
+			"source": "../float/src/cadence/core-contracts/FungibleToken.cdc",
 			"aliases": {
-				"emulator": "0xf8d6e0586b0a20c7"
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x9a0766d93b6608b7",
+				"mainnet": "0xf233dcee88fe0abe"
 			}
 		},
 		"MetadataViews": {
-			"source": "../common_resources/contracts/MetadataViews.cdc",
+			"source": "../float/src/cadence/core-contracts/MetadataViews.cdc",
 			"aliases": {
-				"emulator": "0xf8d6e0586b0a20c7"
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x631e88ae7f1d7c20",
+				"mainnet": "0x1d7e57aa55817448"
+			}
+		},
+		"GrantedAccountAccess": {
+			"source": "../float/src/cadence/sharedaccount/GrantedAccountAccess.cdc",
+			"aliases": {
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x0afe396ebc8eee65",
+				"mainnet": "0x2d4c3caffbeab845"
+			}
+		},
+		"FlowToken": {
+			"source": "../float/src/cadence/core-contracts/FlowToken.cdc",
+			"aliases": {
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x7e60df042a9c0868",
+				"mainnet": "0x1654653399040a61"
+			}
+		},
+		"FindViews": {
+			"source": "../float/src/cadence/core-contracts/FindViews.cdc",
+			"aliases": {
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x35717efbbce11c74",
+				"mainnet": "0x097bafa4e0b48eef"
+			}
+		},
+		"FLOAT": {
+			"source": "../float/src/cadence/float/FLOAT.cdc",
+			"aliases": {
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0x0afe396ebc8eee65",
+				"mainnet": "0x2d4c3caffbeab845"
 			}
 		},
 		"TestContract": {
@@ -97,8 +135,15 @@
 	"deployments": {
 		"emulator": {
 			"emulator-account": [
+				"NonFungibleToken",
+				"MetadataViews",
+				"GrantedAccountAccess",
+				"FungibleToken",
+				"FlowToken",
+				"FindViews",
 				"TestContract",
-				"Shapes"
+				"Shapes",
+				"FLOAT"
 			]
 		},
 		"testnet": {

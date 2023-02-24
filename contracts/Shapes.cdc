@@ -1,6 +1,6 @@
 /*
     Main contract to establish the Shapes resources and associated mechanism. The contract establish a series of
-    NFTs under the NonFungibleToken standard.
+    NFTs and respective Collection resources.
 
     The total supply of each shape is going to be bound with a contract variable and enforced with a function that
     regulates mints, i.e., mints for a given shape can only happen if the count for that shape <= maxCount (also
@@ -10,10 +10,18 @@
 
 */
 
-// Omit this contract because I need to setup my own flavour of Collections. The NFTs, not so much
+// Omit this contract because I need to setup my own flavour of Collections in order to limit these to hold one NFT of several types at a time. The NFTs, not so much
 // import NonFungibleToken from "../../common_resources/contracts/NonFungibleToken.cdc"
+import FLOAT from "../../float/src/cadence/float/FLOAT.cdc"
 
 pub contract Shapes {
+
+    // We are going to use this flag to enable/disable the reset of Collection and Admin resources upon contract deployment. During development, changes in the code regulating
+    // these resources changes a lot. To avoid cluttering the storage with a ton of versions of the same resource, this switch is used to enable a bit of storage cleanup code
+    // Instead of deleting/adding that code whenever some development needs to be done, this switch, which cannot be changed after deployment, allows us to ease this process.
+    // Once the code is ready for PROD, set it to false and forget about it
+    pub let devMode: Bool
+
     //------------ CONTRACT VARIABLES AND CONSTANTS --------------------------------
     // Set of variables to keep up with the number of shapes "out there"
     // totalSupply keeps track of how many units of the shape were minted so far
@@ -37,9 +45,11 @@ pub contract Shapes {
     pub let maxStars: UInt64
 
     // Set the storage paths at the root of the contract too
+    // Collection storage and public
     pub let collectionStorage: StoragePath
     pub let collectionPublic: PublicPath
 
+    // Shape admin storage and private
     pub let adminStorage: StoragePath
     pub let adminPrivate: PrivatePath
 
@@ -55,7 +65,6 @@ pub contract Shapes {
     access(account) var ownedPentagons: @{UInt64: Shapes.Pentagon}
     access(account) var ownedCircles: @{UInt64: Shapes.Circle}
     access(account) var ownedStars: @{UInt64: Shapes.Star}
-    //------------------------------------------------------------------------------
 
     //------------ CONTRACT EVENTS -------------------------------------------------
     // Event for when the contract is initialized (deployed successfully)
@@ -327,6 +336,11 @@ pub contract Shapes {
         pub var score: UInt64
 
         // Now the deposit functions
+        // NOTE: The deposit function are set to pub because, theoretically, a user is free to deposit a shape into another user's account. But in order to do
+        // that he/she needs to either 1. withdraw a shape from his/her account first or, 2. mint a new shape. Both actions are forbidden to a non Admin user due to
+        // access(account) access control for the withdraw function in 1 and restricting the minting of Shapes to only the contract creation for 2, i.e, there is no
+        // function or method to mint shapes outside of the contract.
+        // Therefore these function are a bit irrelevant, but what the heck, we only figured this out after these had been written...
         pub fun depositSquare(square: @Shapes.Square): Void {
             // The mechanics to ensure that only one Square (or any other shape) are in this collection at a time were defined in the interface above.
             // At this point we need only to store the shape received in the correct place in the Collection
@@ -482,7 +496,8 @@ pub contract Shapes {
             return nil
         }
 
-        // And the conditioned withdraw functions
+        // And the conditioned withdraw functions.
+        // NOTE: Setting the function to access(account) disables them from being used by random users. Only the contract deployer can invoke them
         access(account) fun withdrawSquare(): @Shapes.Square {
             // As with the deposit functions, the pre conditions implemented in the Interface above take care of guaranteeing that a shape exists in the Collection
             // If the code gets here, there is a shape in the variable in question
@@ -799,6 +814,28 @@ pub contract Shapes {
         }
     }
 
+    /*
+        To keep this code organized, we are abstracting all FLOAT integrations in a dedicated Admin resource, similar to the Admin resource above.
+        This Admin is used to create FLOAT Events, mint and distribute FLOAT NFTs based on the Event created. The Admin also manages the Events (create
+        and delete them)
+    */
+    pub resource floatAdmin {
+        /*
+            Wrapper for the Float Event Resource creation
+            input:
+                name: String - Name of the event
+                description: String - Description of the event
+                extraMetadata: {String: AnyStruct} - A String key based dictionary with extra metadata do add to event
+                image: String - A base64 encoded image, provided as a String
+                url: String - The URL of the event
+                verifiers: {String: [{FLOAT.IVerifier}]} - Check the FLOATVerifiers.cdc contract for details of this parameter. It allows to set time limits for claimability,
+                passwords, etc to claim FLOATs associated to the event
+
+            output: UInt64 - A Float Event Resource ID for future reference, since the resource itself gets saved in the internal dictionary.
+        */
+
+    }
+
     //------------------------------------------------------------------------------
     
     //------------ CONTRACT FUNCTIONS ----------------------------------------------
@@ -877,6 +914,9 @@ pub contract Shapes {
     
 
     init() {
+        // Set the state of the Development right at the beginning
+        self.devMode = true
+
         // Initialize the counting variables to 0
         self.totalSupply = 0
         self.squareTotalSupply = 0
@@ -888,20 +928,23 @@ pub contract Shapes {
         // Set the maximum count constants to the predefined values. These can change in the future if the demand requires it.
         // Since these are set with a "let", they can only be changed with a contract update, which can only be done by the contract
         // deployer (admin)
+        if (self.devMode) {
+            // TEST Values - Smaller set to speed up contract deployment
+            self.maxSquares = 50
+            self.maxTriangles = 25
+            self.maxPentagons = 12
+            self.maxCircles = 6
+            self.maxStars = 3
+        }
+        else {
+            // PROD Values
+            self.maxSquares = 5000
+            self.maxTriangles = 2500
+            self.maxPentagons = 1250
+            self.maxCircles = 625
+            self.maxStars = 100
+        }
 
-        // REAL VALUES
-        // self.maxSquares = 5000
-        // self.maxTriangles = 2500
-        // self.maxPentagons = 1250
-        // self.maxCircles = 625
-        // self.maxStars = 100
-
-        // TEST VALUES
-        self.maxSquares = 50
-        self.maxTriangles = 25
-        self.maxPentagons = 12
-        self.maxCircles = 6
-        self.maxStars = 3
         self.maxSupply = self.maxCircles + self.maxTriangles + self.maxPentagons + self.maxCircles + self.maxStars
 
         // Initialize the inner storage dictionaries
@@ -918,12 +961,12 @@ pub contract Shapes {
         self.adminStorage = /storage/AdminStorage
         self.adminPrivate = /private/AdminStorage
 
-        // ----------------------------- TEST BLOCK - REMOVE IN PROD ----------------------
-        let randomAdmin: @AnyResource <- self.account.load<@AnyResource>(from: self.adminStorage)
-        destroy randomAdmin
+        if (self.devMode) {
+            let randomAdmin: @AnyResource <- self.account.load<@AnyResource>(from: self.adminStorage)
+            destroy randomAdmin
 
-        self.account.unlink(self.adminPrivate)
-        // --------------------------------------------------------------------------------
+            self.account.unlink(self.adminPrivate)
+        }
 
         // Create, save and link an Admin resource to the private storage
         let admin: @Shapes.Admin <- create Admin()
@@ -934,6 +977,21 @@ pub contract Shapes {
         // Admin is ready. Emit the event to notify people
         emit self.AdminReady()
 
+        // In oder to integrate FLOATs into our project, create and link a new FLOATEventsCollection at contract deployment. This collection is to be linked to the
+        // private path (provided in the FLOAT contract) so that only the contract deployer can control the FLOATEvents in it
+        if(self.devMode) {
+            let randomFloatEventsCollection: @AnyResource <- self.account.load<@AnyResource>(from: FLOAT.FLOATEventsStoragePath)
+            destroy randomFloatEventsCollection
+
+            self.account.unlink(FLOAT.FLOATEventsPrivatePath)
+            self.account.unlink(FLOAT.FLOATEventsPublicPath)
+        }
+
+        let floatEvents: @FLOAT.FLOATEvents <- FLOAT.createEmptyFLOATEventCollection()
+        self.account.save(<- floatEvents, to: FLOAT.FLOATEventsStoragePath)
+        self.account.link<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPrivatePath, target: FLOAT.FLOATEventsStoragePath)
+
+        // ----------------------- SHAPE NFT MINT ------------------------------------------
         // All NFTs are going to be mint into the contract dictionaries
         // First, the squares
         var counter: UInt64 = 1
@@ -997,8 +1055,8 @@ pub contract Shapes {
         }
 
         emit AllStarsMinted(amount: counter)
-
+        // --------------------------------------------------------------------------------
         emit ContractInitialized()
     }
- }
+}
  
