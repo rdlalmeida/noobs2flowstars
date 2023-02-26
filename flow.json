@@ -65,7 +65,8 @@
 		"TestContract": {
 			"source": "./contracts/TestContract.cdc",
 			"aliases": {
-				"emulator": "0xf8d6e0586b0a20c7"
+				"emulator": "0xf8d6e0586b0a20c7",
+				"testnet": "0xb7fb1e0ae6485cf6"
 			}
 		},
 		"Shapes": {
@@ -148,6 +149,7 @@
 		},
 		"testnet": {
 			"testnet-account": [
+				"TestContract"
 			]
 		}
 	}

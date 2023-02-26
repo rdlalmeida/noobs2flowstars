@@ -1,0 +1,47 @@
+const l1_questions = [
+    {
+        questionText: "Which phase of the internet was read only?",
+        answerOptions: [
+            { answerText: "web1.0", "isCorrect": true },
+            { answerText: "web2.0", "isCorrect": false },
+            { answerText: "web3.0", "isCorrect": false },
+            { answerText: "web4.0", "isCorrect": false }
+        ]
+    },
+    {
+        questionText: "In which phase is the internet decentralized?",
+        answerOptions: [
+            { answerText: "web1.0", "isCorrect": false },
+            { answerText: "web2.0", "isCorrect": false },
+            { answerText: "web3.0", "isCorrect": true },
+            { answerText: "web4.0", "isCorrect": false }
+        ]
+    },
+    {
+        questionText: "A user can own data on web1.0?",
+        answerOptions: [
+            { answerText: "True", "isCorrect": false },
+            { answerText: "False", "isCorrect": true }
+        ]
+    },
+    {
+        questionText: "How many locations does web2.0 use to store accessible data?",
+        answerOptions: [
+            { answerText: "Three locations", "isCorrect": false },
+            { answerText: "One location", "isCorrect": true },
+            { answerText: "No locations", "isCorrect": false },
+            { answerText: "Seven locations", "isCorrect": false }
+        ]
+    },
+    {
+        questionText: "How does one access data on web3.0?",
+        answerOptions: [
+            { answerText: "A magic whiteboard", "isCorrect": false },
+            { answerText: "Snail main in a PO Box", "isCorrect": false },
+            { answerText: "In a blockchain", "isCorrect": true },
+            { answerText: "Through a well tuned microwave", "isCorrect": false }
+        ]
+    }
+];
+
+export { l1_questions }

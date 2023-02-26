@@ -1,51 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { l1_questions } from "./components/Questions"
+import * as fcl from "@onflow/fcl";
+import "./flow/config.js"
+import styles from "./styles/nav.css"
+import raw from "./flow/cadence/transactions/TestTransaction.cdc"
 
-export default function App() {
-	const questions = [
-		{
-			questionText: "Which phase of the internet was read only?",
-			answerOptions: [
-				{ answerText: "web1.0", "isCorrect": true },
-				{ answerText: "web2.0", "isCorrect": false },
-				{ answerText: "web3.0", "isCorrect": false },
-				{ answerText: "web4.0", "isCorrect": false }
-			]
-		},
-		{
-			questionText: "In which phase is the internet decentralized?",
-			answerOptions: [
-				{ answerText: "web1.0", "isCorrect": false },
-				{ answerText: "web2.0", "isCorrect": false },
-				{ answerText: "web3.0", "isCorrect": true },
-				{ answerText: "web4.0", "isCorrect": false }
-			]
-		},
-		{
-			questionText: "A user can own data on web1.0?",
-			answerOptions: [
-				{ answerText: "True", "isCorrect": false },
-				{ answerText: "False", "isCorrect": true }
-			]
-		},
-		{
-			questionText: "How many locations does web2.0 use to store accessible data?",
-			answerOptions: [
-				{ answerText: "Three locations", "isCorrect": false },
-				{ answerText: "One location", "isCorrect": true },
-				{ answerText: "No locations", "isCorrect": false },
-				{ answerText: "Seven locations", "isCorrect": false }
-			]
-		},
-		{
-			questionText: "How does one access data on web3.0?",
-			answerOptions: [
-				{ answerText: "A magic whiteboard", "isCorrect": false },
-				{ answerText: "Snail main in a PO Box", "isCorrect": false },
-				{ answerText: "In a blockchain", "isCorrect": true },
-				{ answerText: "Through a well tuned microwave", "isCorrect": false }
-			]
-		}
-	];
+function App() {
+	// Get the questions from the dedicated file
+	const questions = l1_questions
+	
+	fetch(raw)
+		.then(r => r.text())
+		.then(text => {
+			console.log("Transaction text: ", text)
+		});
+
+	const [user, setUser] = useState({ loggedIn: false });
+
+    useEffect(() => {
+            fcl.currentUser.subscribe(setUser);
+        }, []
+    )
+
+    function logInUser() {
+        if (user.loggedIn) {
+            alert("User ".concat(user.addr).concat(" is already logged in!"));
+        }
+        else {
+            fcl.authenticate();
+        }
+    }
+
+    function logOffUser() {
+        if (user.loggedIn) {
+            fcl.unauthenticate();
+        }
+    }
 
 	const [currentQuestion, setCurrentQuestion] = useState(0);
 	const [showScore, setShowScore] = useState(false);
@@ -63,27 +53,70 @@ export default function App() {
 			setShowScore(true);
 		}
 	};
+
+	// ------------------ CADENCE TRANSACTIONS AND SCRIPTS ------------------------------------------
+
+	async function runAltTestTransaction() {
+		const transactionText = await fetch(raw).then(r => r.text())
+
+		const transactionId = await fcl.mutate({
+			cadence: transactionText,
+			args: (arg, t) => [
+				arg('0x41e49c24e24bd19a', t.Address)
+			],
+			proposer: fcl.authz,
+			payer: fcl.authz,
+			authorizations: [fcl.authz],
+			limit: 999
+		})
+
+		console.log("Alt transaction successfully executed with id " + transactionId)
+	}
+
+	// ----------------------------------------------------------------------------------------------
+
 	return (
-		<div className='app'>
-			{showScore ? (
-				<div className='score-section'>
-					You scored {score} out of {questions.length}
-				</div>
-			) : (
-				<>
-					<div className='question-section'>
-						<div className='question-count'>
-							<span>Question {currentQuestion + 1}</span>/{questions.length}
+		<div>
+			<nav className={styles.Nav}>
+                <h1>Noobs to Flowstars</h1>
+                <button onClick={logInUser}>{user.loggedIn ? "Wallet ".concat(user.addr).concat(" connected!") : "Connect wallet"}</button>
+                <button onClick={logOffUser}>{user.loggedIn ? "Disconnect wallet" : "Wallet not connected"}</button>
+            </nav>
+            <footer className={styles.footer}>
+                <h1>Transaction testing</h1>
+                <div>
+                    <button>{user.loggedIn ? "User is logged in" : "User is logged off!"}</button>
+                    <button onClick={runAltTestTransaction}>Run Test Transaction</button>
+                </div>
+        	</footer>
+			<h1>Questionnaire: </h1>
+			<div className='app'>
+				{user.loggedIn ? (
+					showScore ? (
+						<div className='score-section'>
+							You scored {score} out of {questions.length}
 						</div>
-						<div className='question-text'>{questions[currentQuestion].questionText}</div>
-					</div>
-					<div className='answer-section'>
-						{questions[currentQuestion].answerOptions.map((answerOption) => (
-							<button onClick={() => handleAnswerOptionClick(answerOption.isCorrect)}>{answerOption.answerText}</button>
-						))}
-					</div>
-				</>
-			)}
+					) : (
+						<>
+							<div className='question-section'>
+								<div className='question-count'>
+									<span>Question {currentQuestion + 1}</span>/{questions.length}
+								</div>
+								<div className='question-text'>{questions[currentQuestion].questionText}</div>
+							</div>
+							<div className='answer-section'>
+								{questions[currentQuestion].answerOptions.map((answerOption) => (
+									<button onClick={() => handleAnswerOptionClick(answerOption.isCorrect)}>{answerOption.answerText}</button>
+								))}
+							</div>
+						</>
+					)
+				) : (
+					<div className='score-section'>Log in to play the quiz</div>
+				)}
+			</div>
 		</div>
 	);
 }
+
+export default App

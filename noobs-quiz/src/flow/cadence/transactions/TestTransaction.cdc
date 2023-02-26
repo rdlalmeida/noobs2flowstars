@@ -1,8 +1,4 @@
-/*
-    Simple test transaction to test stuff before implementing it
-*/
-
-import TestContract from "../contracts/TestContract.cdc"
+import TestContract from 0xb7fb1e0ae6485cf6
 
 transaction(anotherUser: Address) {
     prepare(signer: AuthAccount) {

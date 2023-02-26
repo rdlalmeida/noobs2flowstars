@@ -21,6 +21,10 @@ pub contract TestContract {
         return self.account.address.toString()
     }
 
+    pub fun sayGreeting(greet: String): String {
+        return "Hello, this is ".concat(greet)
+    }
+
     pub fun getShortType(shapeType: Type): String {
         // Get the String representation of the shape type
         var longType: String = shapeType.identifier
