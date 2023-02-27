@@ -989,7 +989,10 @@ pub contract Shapes {
 
         let floatEvents: @FLOAT.FLOATEvents <- FLOAT.createEmptyFLOATEventCollection()
         self.account.save(<- floatEvents, to: FLOAT.FLOATEventsStoragePath)
-        self.account.link<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPrivatePath, target: FLOAT.FLOATEventsStoragePath)
+        
+        // The FLOAT Events are always linked to the Public storage. Teoretically, this means that any person can mint a FLOAT so that's why
+        // they are setup with verifiers, such as mint limit, passwords, etc.
+        self.account.link<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPublicPath, target: FLOAT.FLOATEventsStoragePath)
 
         // ----------------------- SHAPE NFT MINT ------------------------------------------
         // All NFTs are going to be mint into the contract dictionaries

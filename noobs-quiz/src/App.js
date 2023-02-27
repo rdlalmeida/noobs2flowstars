@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { l1_questions } from "./components/Questions"
+import { questions } from "./components/Questions"
 import * as fcl from "@onflow/fcl";
 import "./flow/config.js"
 import styles from "./styles/nav.css"
@@ -7,7 +7,11 @@ import raw from "./flow/cadence/transactions/TestTransaction.cdc"
 
 function App() {
 	// Get the questions from the dedicated file
-	const questions = l1_questions
+	const [question_level, setQuestionLevel] = useState(0)
+	const [current_questions, setQuestionSet] = useState(questions[question_level])
+	const [currentQuestion, setCurrentQuestion] = useState(0);
+	const [showScore, setShowScore] = useState(false);
+	const [score, setScore] = useState(0);
 	
 	fetch(raw)
 		.then(r => r.text())
@@ -37,10 +41,6 @@ function App() {
         }
     }
 
-	const [currentQuestion, setCurrentQuestion] = useState(0);
-	const [showScore, setShowScore] = useState(false);
-	const [score, setScore] = useState(0);
-
 	const handleAnswerOptionClick = (isCorrect) => {
 		if (isCorrect) {
 			setScore(score + 1);
@@ -54,6 +54,61 @@ function App() {
 		}
 	};
 
+	const resetQuiz = () => {
+		setCurrentQuestion(0);
+		setScore(0);
+		setShowScore(false);
+	}
+
+	const advanceQuestionLevel = () => {
+		setCurrentQuestion(0);
+		setQuestionLevel(question_level + 1);
+		setQuestionSet(questions[question_level]);
+		setScore(0);
+		setShowScore(false);
+	}
+	// -------------------------------- ELEMENT RENDERING FUNCTIONS ---------------------------------
+	const Quiz = () => {
+		return(
+			<>
+			<div className='question-section'>
+				<div className='question-count'>
+					<h3>Level {question_level + 1}</h3>
+					<span>Question {currentQuestion + 1}</span>/{current_questions.length}
+				</div>
+				<div className='question-text'>{current_questions[currentQuestion].questionText}</div>
+			</div>
+			<div className='answer-section'>
+				{current_questions[currentQuestion].answerOptions.map((answerOption) => (
+					<button onClick={() => handleAnswerOptionClick(answerOption.isCorrect)}>{answerOption.answerText}</button>
+				))}
+			</div>
+		</>
+		)
+	}
+
+	const Score = () => {
+		if (score < questions.length) {
+			return(
+				<div className='score-section'>
+					You scored {score} out of {questions.length}.
+					{score < current_questions.length/2 ? "\nHumm, you need to study some more" : "\nAlmost there..."}
+					<button onClick={resetQuiz}>Restart level</button>
+				</div>
+			)
+		}
+		else {
+			return (
+				<div className='score-section'>
+					Congratulations, you scored {score} out of {questions.length}!
+					<button>Claim FLOAT</button>
+					<button onClick={advanceQuestionLevel}>Next Level</button>
+				</div>
+			)
+		}
+	}
+	// ----------------------------------------------------------------------------------------------
+
 	// ------------------ CADENCE TRANSACTIONS AND SCRIPTS ------------------------------------------
 
 	async function runAltTestTransaction() {
@@ -62,7 +117,7 @@ function App() {
 		const transactionId = await fcl.mutate({
 			cadence: transactionText,
 			args: (arg, t) => [
-				arg('0x41e49c24e24bd19a', t.Address)
+				arg(user.addr, t.Address)
 			],
 			proposer: fcl.authz,
 			payer: fcl.authz,
@@ -93,23 +148,9 @@ function App() {
 			<div className='app'>
 				{user.loggedIn ? (
 					showScore ? (
-						<div className='score-section'>
-							You scored {score} out of {questions.length}
-						</div>
+						<Score />
 					) : (
-						<>
-							<div className='question-section'>
-								<div className='question-count'>
-									<span>Question {currentQuestion + 1}</span>/{questions.length}
-								</div>
-								<div className='question-text'>{questions[currentQuestion].questionText}</div>
-							</div>
-							<div className='answer-section'>
-								{questions[currentQuestion].answerOptions.map((answerOption) => (
-									<button onClick={() => handleAnswerOptionClick(answerOption.isCorrect)}>{answerOption.answerText}</button>
-								))}
-							</div>
-						</>
+						<Quiz />
 					)
 				) : (
 					<div className='score-section'>Log in to play the quiz</div>

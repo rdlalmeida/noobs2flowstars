@@ -48,8 +48,8 @@ transaction_arguments=(
     ${ACCOUNT01_ADDRESS} 
     ${ACCOUNT02_ADDRESS} 
     ${ACCOUNT03_ADDRESS} 
-    "'WolfStars' 'None' 'Noobs to Flowstars creators'" 
-    "'Learning01' 'Learning event #1' 'None' 'www.noobs2flowstars.io' [] [] {}")
+    "'WolfStars' 'https://ipfs.io/ipfs/QmbxVi3HqTMZjA9c7L5spGDLWTBsFuawrKiiQGHwzjh59A?filename=noobs2flowstars_logo.png' 'Noobs to Flowstars creators'" 
+    "'Learning01' 'Learning event #1' 'https://ipfs.io/ipfs/QmcWpR9KfPfefGBoTSZwY4V7nVN2bSPdJ6PS7bC6BAP95D?filename=noobs2flowstars_logo2.png' 'www.noobs2flowstars.io' [] [] {}")
 
 # Another array with the signers to use in each transaction. These are always mandatory
 transactions_signers=(

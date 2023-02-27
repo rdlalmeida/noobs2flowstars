@@ -11,12 +11,16 @@ transaction() {
             destroy oldCollection
 
             signer.unlink(Shapes.collectionPublic)
-        }        
+        }
 
-        // Create, save and link the new collection into the user's account
-        let newCollection: @Shapes.Collection <- Shapes.createEmptyCollection()
-        signer.save(<- newCollection, to: Shapes.collectionStorage)
-        signer.link<&Shapes.Collection>(Shapes.collectionPublic, target: Shapes.collectionStorage)
+        let shapeCollectionCapability: Capability<&Shapes.Collection> = signer.getCapability<&Shapes.Collection>(Shapes.collectionPublic)
+
+        if (!shapeCollectionCapability.check()) {
+            // Create and link a new Collection only if none is present
+            let newCollection: @Shapes.Collection <- Shapes.createEmptyCollection()
+            signer.save(<- newCollection, to: Shapes.collectionStorage)
+            signer.link<&Shapes.Collection>(Shapes.collectionPublic, target: Shapes.collectionStorage)
+        }
     }
 
     execute {

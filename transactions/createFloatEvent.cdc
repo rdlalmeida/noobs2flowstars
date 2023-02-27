@@ -18,15 +18,16 @@
 */
 
 import FLOAT from "../../float/src/cadence/float/FLOAT.cdc"
-// import Shapes from "../contracts/Shapes.cdc"
+import Shapes from "../contracts/Shapes.cdc"
 
 transaction(name: String, description: String, image: String, url: String, initialGroups: [String], verifiers: [{FLOAT.IVerifier}], extraMetadata: {String: AnyStruct}) {
     let floatEvents: &FLOAT.FLOATEvents
     
     prepare(signer: AuthAccount) {
         // Begin by loading the FloatEvents resource reference from private storage
-        self.floatEvents = signer.getCapability<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPrivatePath).borrow() ??
+        self.floatEvents = signer.getCapability<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPublicPath).borrow() ??
             panic("Account ".concat(signer.address.toString()).concat(" does not have a proper FLOATEvents collections set yet!"))
+
     }
 
     execute {
