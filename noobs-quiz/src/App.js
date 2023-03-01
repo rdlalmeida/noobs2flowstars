@@ -11,6 +11,7 @@ import getFLOATCollectionStatus from "./flow/cadence/scripts/getFLOATCollectionS
 import createUserFLOATCollection from "./flow/cadence/transactions/createUserFLOATCollection.cdc"
 import claimFLOATtoUserCollection from "./flow/cadence/transactions/claimFLOATtoUserCollection.cdc"
 import getFlowVaultStatus from "./flow/cadence/scripts/getFlowVaultStatus.cdc"
+import buySquare from "./flow/cadence/transactions/buySquare.cdc"
 
 
 function App() {
@@ -48,6 +49,24 @@ function App() {
 		})
 
 		console.log("Alt transaction successfully executed with id " + transactionId)
+	}
+
+	// Function that lets a user buy a Square to start the quiz
+	async function purchaseSquare() {
+		const transactionText = await fetch(buySquare).then(r => r.text())
+
+		const transactionId = await fcl.mutate({
+			cadence: transactionText,
+			args: (arg, t) => [
+				arg(shapeContractAddr, t.Address)
+			],
+			proposer: fcl.authz,
+			payer: fcl.authz,
+			authorizations: [fcl.authz],
+			limit: gas_limit
+		})
+
+		console.log("Account " + user.addr + " successfully bought a Square from " + shapeContractAddr + ". TransactionID = " + transactionId)
 	}
 
 	// Function to claim a FLOAT at the end of a learning level
@@ -252,6 +271,7 @@ function App() {
 			)
 		}
 	}
+
 	// ----------------------------------------------------------------------------------------------
 
 	return (
@@ -263,10 +283,21 @@ function App() {
             </nav>
             <footer className={styles.footer}>
                 <h1>Collection Setup</h1>
-                <div>
-                    <button onClick={resolveShapeCollection}>Get a Shape Collection</button>
-                    <button onClick={resolveFLOATCollection}>Get a FLOAT Collection</button>
-                </div>
+				{
+					user.loggedIn ? (
+					<div>
+						<button onClick={resolveShapeCollection}>Get a Shape Collection</button>
+						<button onClick={resolveFLOATCollection}>Get a FLOAT Collection</button>
+						<button onClick={purchaseSquare}>Buy a Square</button>
+					</div>
+					) : (
+					<div className="setup">
+						<div className="score-section">
+							Connect a wallet to start!
+						</div>
+					</div>
+					)
+				}
         	</footer>
 			<h1>Questionnaire: </h1>
 			<div className='app'>

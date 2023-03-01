@@ -994,7 +994,7 @@ pub contract Shapes {
 
     init() {
         // Set the state of the Development right at the beginning
-        self.devMode = true
+        self.devMode = false
 
         // Initialize the counting variables to 0
         self.totalSupply = 0
