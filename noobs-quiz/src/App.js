@@ -12,6 +12,8 @@ import createUserFLOATCollection from "./flow/cadence/transactions/createUserFLO
 import claimFLOATtoUserCollection from "./flow/cadence/transactions/claimFLOATtoUserCollection.cdc"
 import getFlowVaultStatus from "./flow/cadence/scripts/getFlowVaultStatus.cdc"
 import buySquare from "./flow/cadence/transactions/buySquare.cdc"
+import collectionUpgrade from "./flow/cadence/transactions/upgradeCollection.cdc"
+import getShapeLevel from "./flow/cadence/scripts/getShapeLevel.cdc"
 
 
 function App() {
@@ -69,6 +71,24 @@ function App() {
 		console.log("Account " + user.addr + " successfully bought a Square from " + shapeContractAddr + ". TransactionID = " + transactionId)
 	}
 
+	// Function to upgrade a Collection up level upgrade by switching the current shape with the next one
+	async function upgradeCollection() {
+		const transactionText = await fetch(collectionUpgrade).then(r => r.text())
+
+		const transactionId = await fcl.mutate({
+			cadence: transactionText,
+			args: (arg, t) => [
+				arg(shapeContractAddr, t.Address)
+			],
+			proposer: fcl.authz,
+			payer: fcl.authz,
+			authorizations: [fcl.authz],
+			limit: gas_limit
+		})
+
+		console.log("Account " + user.addr + " successfully upgraded!. TransactionID = " + transactionId)
+	}
+
 	// Function to claim a FLOAT at the end of a learning level
 	async function claimFLOAT() {
 		const transactionText = await fetch(claimFLOATtoUserCollection).then(r => r.text())
@@ -85,6 +105,20 @@ function App() {
 			limit: gas_limit
 		})
 		console.log("FLOAT claimed with transaction " + transactionId)
+	}
+
+	// Function to determine the level in which the user is, based on the shape in its collection
+	async function getQuestionLevel() {
+		const scriptText = await fetch(getShapeLevel).then(r => r.text())
+
+		const questionLevel = await fcl.query({
+			cadence: scriptText,
+			args: (arg, t) => [arg(user.addr, t.Address)]
+		});
+
+		console.log("Account " + user.addr + " Shape level: " + questionLevel)
+
+		return questionLevel;
 	}
 
 	// Function to return the ids all Events. The Ids are ordered by level, i.e., lowest ID = lowest Level and so on
@@ -222,13 +256,20 @@ function App() {
 		setQuestionSet(questions[question_level])
 	}, [question_level])
 
-	const advanceQuestionLevel = () => {
-		setQuestionLevel(question_level + 1);
+
+	async function advanceQuestionLevel() {
+		const qlevel = await getQuestionLevel()
+		if (qlevel <= question_level) {
+			// Only upgrade the collection if the shape level is less or equal to the question level
+			// To avoid wrongful upgrades
+			await upgradeCollection()
+		}
+		await setQuestionLevel(question_level + 1);
 		// The new question set is updated with the useEffect above
 		// setQuestionSet(questions[question_level])
-		setScore(0);
-		setShowScore(false);
-		setCurrentQuestion(0);
+		await setScore(0);
+		await setShowScore(false);
+		await setCurrentQuestion(0);
 	}
 
 	// -------------------------------- ELEMENT RENDERING FUNCTIONS ---------------------------------

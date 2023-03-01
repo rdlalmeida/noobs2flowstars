@@ -82,7 +82,7 @@ const questions = [
                 { answerText: "True", "isCorrect": false },
                 { answerText: "False", "isCorrect": true }
             ]
-        }    
+        }
     ],
     [
         // Level 2
@@ -150,7 +150,6 @@ const questions = [
                 { answerText: "HOODLUMS & NBA HOTSHOT ", "isCorrect": true },
                 { answerText: "JEEPERS CREEPERS & LOVELORN", "isCorrect": false },
                 { answerText: "CRY ME A RIVER & RIVERDANCE", "isCorrect": false }
-    
             ]
         },
         {
@@ -167,7 +166,7 @@ const questions = [
                 { answerText: "2018", "isCorrect": false },
                 { answerText: "2020", "isCorrect": true },
                 { answerText: "2009", "isCorrect": false }        ]
-        }    
+        }
     ],
     [
         // Level 3

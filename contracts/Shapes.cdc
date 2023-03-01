@@ -612,6 +612,8 @@ pub contract Shapes {
                 Shapes.ownedSquares.length > 0: "There are no more Squares left to buy"
             }
         }
+
+        pub fun upgradeCollection(collectionRef: &Shapes.Collection): UInt64
     }
 
     /* 
