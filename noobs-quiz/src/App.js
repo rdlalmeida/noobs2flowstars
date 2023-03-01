@@ -55,20 +55,31 @@ function App() {
 
 	// Function that lets a user buy a Square to start the quiz
 	async function purchaseSquare() {
-		const transactionText = await fetch(buySquare).then(r => r.text())
+		const qlevel = await getQuestionLevel()
 
-		const transactionId = await fcl.mutate({
-			cadence: transactionText,
-			args: (arg, t) => [
-				arg(shapeContractAddr, t.Address)
-			],
-			proposer: fcl.authz,
-			payer: fcl.authz,
-			authorizations: [fcl.authz],
-			limit: gas_limit
-		})
+		if (qlevel == 0) {
+			const transactionText = await fetch(buySquare).then(r => r.text())
 
-		console.log("Account " + user.addr + " successfully bought a Square from " + shapeContractAddr + ". TransactionID = " + transactionId)
+			const transactionId = await fcl.mutate({
+				cadence: transactionText,
+				args: (arg, t) => [
+					arg(shapeContractAddr, t.Address)
+				],
+				proposer: fcl.authz,
+				payer: fcl.authz,
+				authorizations: [fcl.authz],
+				limit: gas_limit
+			})
+	
+			console.log("Account " + user.addr + " successfully bought a Square from " + shapeContractAddr + ". TransactionID = " + transactionId)
+		}
+		else if (qlevel == 1) {
+			alert("Account " + user.addr + " already has a Square!")
+		}
+		else {
+			alert("Account " + user.addr + " already has some other shape already!")
+		}
+
 	}
 
 	// Function to upgrade a Collection up level upgrade by switching the current shape with the next one
