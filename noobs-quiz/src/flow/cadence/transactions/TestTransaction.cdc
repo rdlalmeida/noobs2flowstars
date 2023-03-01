@@ -1,6 +1,6 @@
-import TestContract from 0xb7fb1e0ae6485cf6
+import TestContract from 0xShapes
 
-transaction(anotherUser: Address) {
+transaction() {
     prepare(signer: AuthAccount) {
         let testNFT: @TestContract.TestNFT <- TestContract.createTestNFT()
 
@@ -13,6 +13,8 @@ transaction(anotherUser: Address) {
         log("Deployer/signer address is ".concat(TestContract.returnDeployerAddress()))
 
         log("The other user's address: ".concat(anotherUser.toString()))
+
+        log("All is correct!")
 
     }
 

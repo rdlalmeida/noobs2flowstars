@@ -20,7 +20,7 @@
 import FLOAT from "../../float/src/cadence/float/FLOAT.cdc"
 import Shapes from "../contracts/Shapes.cdc"
 
-transaction(name: String, description: String, image: String, url: String, initialGroups: [String], verifiers: [{FLOAT.IVerifier}], extraMetadata: {String: AnyStruct}) {
+transaction() {
     let floatEvents: &FLOAT.FLOATEvents
     
     prepare(signer: AuthAccount) {
@@ -31,17 +31,50 @@ transaction(name: String, description: String, image: String, url: String, initi
     }
 
     execute {
-        // Create the event using the floatEvents reference
-        let eventID: UInt64 = self.floatEvents.createEvent(
-            claimable: true,
-            description: description,
-            image: image,
-            name: name,
-            transferrable: false,
-            url: url,
-            verifiers: verifiers,
-            extraMetadata,
-            initialGroups: initialGroups
-        )
+        // Create 5 Events into the FLOAT Events, one per learning level
+        let eventNames: [String] = [
+            "1.SuperEasy", 
+            "2.Easy", 
+            "3.Normal", 
+            "4.Hard", 
+            "5.Super Hard"]
+        
+        let eventDescriptions: [String] = [
+            "Beginner learninglevel",
+            "Intermediate learning level",
+            "Entusiast learning level",
+            "Professional learning level",
+            "Flow Guru"
+        ]
+
+        let eventImages: [String] = [
+            "https://ipfs.io/ipfs/QmVzNybHoGojH6t8GdcVSYgs7TvPGYP8LfEFPVYTGsW4W5?filename=n2f_l1.png",
+            "https://ipfs.io/ipfs/QmRq47PLjsRHrRCEdTHMgXVLb4BKgekE7ZUjtAJaBxuTbG?filename=n2f_l2.png",
+            "https://ipfs.io/ipfs/QmPLJH18WBavPDJ1BhTVWZfyH9HaT2NEAakrUeKMv14VTQ?filename=n2f_l3.png",
+            "https://ipfs.io/ipfs/Qmepp9hpMdYMKSsk49My8HtiwjqYiHKaCWtfwGv4PuFRDD?filename=n2f_l4.png",
+            "https://ipfs.io/ipfs/QmSdr6bjJxurvB8Visjr9Fxv6rQA8cYc13FnR9ot3t628h?filename=n2f_l5.png"
+        ]
+
+        var i: Int = 0
+
+        while(i < eventNames.length) {
+            // Create the events. NOTE: By some reason, providing the initialGroups as [groupName] does not work. We had much time to debug why thus is
+            // but it turns out that if only one group exists in the FloatEvents, any FLOAT created under any of these events is associated to it
+            let eventId: UInt64 = self.floatEvents.createEvent(
+                claimable: true,
+                description: eventDescriptions[i],
+                image: eventImages[i],
+                name: eventNames[i],
+                transferrable: false,
+                url: "www.noobs2flowstars.io",
+                verifiers: [],
+                {},
+                initialGroups: []
+            )
+
+            // There's no need to emit an Event here since the FLOAT contract already does this
+
+            i = i + 1
+        }
     }
 }
