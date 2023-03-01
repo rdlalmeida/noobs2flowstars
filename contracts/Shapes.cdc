@@ -13,6 +13,8 @@
 // Omit this contract because I need to setup my own flavour of Collections in order to limit these to hold one NFT of several types at a time. The NFTs, not so much
 // import NonFungibleToken from "../../common_resources/contracts/NonFungibleToken.cdc"
 import FLOAT from "../../float/src/cadence/float/FLOAT.cdc"
+import FlowToken from "../../float/src/cadence/core-contracts/FlowToken.cdc"
+import FungibleToken from "../../float/src/cadence/core-contracts/FungibleToken.cdc"
 
 pub contract Shapes {
 
@@ -51,7 +53,12 @@ pub contract Shapes {
 
     // Shape admin storage and private
     pub let adminStorage: StoragePath
+    pub let adminPublic: PublicPath
     pub let adminPrivate: PrivatePath
+
+    // Storage paths for the FlowToken Vault
+    pub let flowVaultStorage: StoragePath
+    pub let flowVaultPublic: PublicPath
 
     /*
         Dictionaries to store the minted shapes for future distribution
@@ -95,8 +102,20 @@ pub contract Shapes {
     // Event emited when all Stars are minted
     pub event AllStarsMinted(amount: UInt64)
 
+    // Event emited when the Float Events Resource is created
+    pub event FLOATEventsCreated(in: Address)
+
+    // Event emited when a Group is created into a FLOAT events
+    pub event FLOATEventsGroupCreated(groupName: String)
+
     // Event emited when the Admin Resource is created, saved and linked to the private storage
     pub event AdminReady()
+
+    // Event emited when the Flow Vault is created, saved and linked (the receiver)
+    pub event FlowVaultCreated()
+
+    // Event emited when a Square is bought
+    pub event SquareBought(squareId: UInt64, owner: Address?)
 
     // Event emited when a Collection is upgraded
     pub event CollectionUpgraded(from: String, to: String, account: Address?)
@@ -207,7 +226,6 @@ pub contract Shapes {
             This interface check if there a shape in the collection first (if the condition is true, i.e., the length of the array is indeed 0) before attempting to
             withdraw the shape and checks if the array is not empty after the withdrawl, which triggers the post condition. This effectively forces the shape array
             to be either empty or with only one shape at any moment, at most.
-            TODO: These ones need extensive testing
         */
         access(account) fun withdrawSquare(): @Shapes.Square {
             pre {
@@ -269,11 +287,18 @@ pub contract Shapes {
         pub let id: UInt64
         pub let score: UInt64
         pub let nftCount: UInt64
+        pub let price: UFix64
 
         init(count: UInt64) {
             self.id = self.uuid
             self.score = 1
             self.nftCount = count
+            if (Shapes.devMode) {
+                self.price = 50.0
+            }
+            else {
+                self.price = 0.5
+            }
         }
     }
 
@@ -579,13 +604,23 @@ pub contract Shapes {
         }
     }
 
+    pub resource interface AdminPublic {
+        pub fun buySquare(recipient: &Collection, payment: @FungibleToken.Vault): UInt64 {
+            pre {
+                // To be able to buy a Square,
+                // 1. There has to be some left to buy
+                Shapes.ownedSquares.length > 0: "There are no more Squares left to buy"
+            }
+        }
+    }
+
     /* 
         We also need an Admin Resource that has the ability to move shapes from and into the contract storage dictionaries. Other contracts (like TopShot) that have
         variable sized minting sets use Collections for this purpose, which makes perfect sense in that context. Ourselves however, because of our N to 1 dynamic here, i.e., 
         where the contract/admin size stores multiple Resources at any given time but the user Collections can only store 1, we need to be creative.
         Another approach was to create a Admin Collection that could store multiple NFTs as opposed to the user ones.
     */
-    pub resource Admin {
+    pub resource Admin: AdminPublic {
         /*
             The most important functions here are the deposit and withdraw functions
             As with most up to here, the deposit function is actually a series of deposit functions, one per shape, to keep it simple, believe it or not
@@ -595,8 +630,45 @@ pub contract Shapes {
             input: collectionRef: &Shapes.Collection - A reference to a collection to where the shape is going to be deposited to.
             output: Void. If the pre-condition is not triggered, the function is successful
         */
+
+        /*
+            Function to buy a Square from the internal collection using Flow.
+            input:
+                recipient: &Collection - A reference to the Collection where the Square is to be deposited after purchase
+                payment: @FlowToken.Vault - A Vault Resource with enough token to perform the purchase
+            output: UInt64 - If the purchase is successful, the id of the Square bought is returned
+        */
+        pub fun buySquare(recipient: &Collection, payment: @FungibleToken.Vault): UInt64 {
+            // Get a reference to Shapes contract's Flow Vault
+            let flowVaultReceiverRef: &FlowToken.Vault{FungibleToken.Receiver} = 
+            Shapes.account.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(Shapes.flowVaultPublic).borrow() ??
+                panic("There is no FlowToken.Vault available to receive the payment!")
+
+            // Validate that the Vaults are from the same type, i.e., the contain the same type of tokens
+            assert(
+                payment.getType() == flowVaultReceiverRef.getType(),
+                message: "Mismatch between the payment provided ("
+                    .concat(payment.getType().identifier)
+                    .concat(") and the expected token type to pay ("
+                    .concat(flowVaultReceiverRef.getType().identifier)
+                    .concat("). Unable to process payment")
+                )
+            )
+
+            // Perform the payment
+            flowVaultReceiverRef.deposit(from: <- payment)
+
+            // Payment concluded. Deposit a Square into the user's Collection
+
+            let purchasedSquareId: UInt64 = self.depositSquare(collectionRef: recipient)
+
+            // Emit the event
+            emit SquareBought(squareId: purchasedSquareId, owner: self.owner?.address)
+
+            return purchasedSquareId
+        }
         
-        pub fun depositSquare(collectionRef: &Shapes.Collection): Void {
+        pub fun depositSquare(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedSquares.length != 0: "There are no Squares left to deposit! Cannot continue!"
             }
@@ -605,43 +677,53 @@ pub contract Shapes {
 
             // Got it. Deposit it in Collection
             collectionRef.depositSquare(square: <- squareToDeposit)
+
+            return collectionRef.mySquare[0].id
         }
 
         // The remaining ones are the same
-        pub fun depositTriangle(collectionRef: &Shapes.Collection): Void {
+        pub fun depositTriangle(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedTriangles.length != 0: "There are no Triangles left to deposit! Cannot continue!"
             }
 
             let triangleToDeposit: @Shapes.Triangle <- Shapes.ownedTriangles.remove(key: Shapes.getAllTriangleIDs().removeFirst())!
             collectionRef.depositTriangle(triangle: <- triangleToDeposit)
+
+            return collectionRef.myTriangle[0].id
         }
 
-        pub fun depositPentagon(collectionRef: &Shapes.Collection): Void {
+        pub fun depositPentagon(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedPentagons.length != 0: "There are no Pentagons left to deposit! Cannot continue!"
             }
 
             let pentagonToDeposit: @Shapes.Pentagon <- Shapes.ownedPentagons.remove(key: Shapes.getAllPentagonIDs().removeFirst())!
             collectionRef.depositPentagon(pentagon: <- pentagonToDeposit)
+
+            return collectionRef.myPentagon[0].id
         }
 
-        pub fun depositCircle(collectionRef: &Shapes.Collection): Void {
+        pub fun depositCircle(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedCircles.length != 0: "There are no Circles left to deposit! Cannot continue!"
             }
 
             let circleToDeposit: @Shapes.Circle <- Shapes.ownedCircles.remove(key: Shapes.getAllCircleIDs().removeFirst())!
             collectionRef.depositCircle(circle: <- circleToDeposit)
+
+            return collectionRef.myCircle[0].id
         }
 
-        pub fun depositStar(collectionRef: &Shapes.Collection): Void {
+        pub fun depositStar(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedStars.length != 0: "There are no Stars left to deposit! Cannot continue!"
             }
 
             let starToDeposit: @Shapes.Star <- Shapes.ownedStars.remove(key: Shapes.getAllStarIDs().removeFirst())!
             collectionRef.depositStar(star: <- starToDeposit)
+
+            return collectionRef.myStar[0].id
         }
 
         /*
@@ -722,11 +804,11 @@ pub contract Shapes {
             you cannot upgrade it further) and switches it for the next shape in the sequence Square -> Triangle -> Pentagon -> Circle -> Star
             
             input: &Shapes.Collection - a reference for a user Collection
-            output: Void
+            output: UInt64 - returns the ID of the shape that it was upgraded to
 
             The function does not returns anything. As usual, pre and post conditions are used to prevent illegal operations
         */
-        pub fun upgradeCollection(collectionRef: &Shapes.Collection): Void {
+        pub fun upgradeCollection(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 // One single pre condition should be enough to detect if a collection is upgradable: check if the Square, Triangle, Pentagon and Circle are all empty
                 // If that it is the case, the Collection is either empty or has only a Star in it. In either case it is not upgradable
@@ -749,8 +831,8 @@ pub contract Shapes {
                 // Emit the corresponding event
                 emit Shapes.CollectionUpgraded(from: "Square", to: "Triangle", account: self.owner?.address)
 
-                // Do a return Void to prevent the next ifs from running
-                return
+                // Return the id of the upgraded shape
+                return collectionRef.myTriangle[0].id
             }
 
             // The rest is more of the same
@@ -763,7 +845,7 @@ pub contract Shapes {
 
                 emit Shapes.CollectionUpgraded(from: "Triangle", to: "Pentagon", account: self.owner?.address)
 
-                return
+                return collectionRef.myPentagon[0].id
             }
 
             if (collectionRef.myPentagon.length != 0) {
@@ -775,7 +857,7 @@ pub contract Shapes {
 
                 emit Shapes.CollectionUpgraded(from: "Pentagon", to: "Circle", account: self.owner?.address)
 
-                return
+                return collectionRef.myCircle[0].id
             }
 
             // The last case is the default. There's no need to do an if here
@@ -786,6 +868,7 @@ pub contract Shapes {
             self.depositStar(collectionRef: collectionRef)
 
             emit Shapes.CollectionUpgraded(from: "Circle", to: "Star", account: self.owner?.address)
+            return collectionRef.myStar[0].id
         }
 
         /* 
@@ -814,28 +897,6 @@ pub contract Shapes {
         }
     }
 
-    /*
-        To keep this code organized, we are abstracting all FLOAT integrations in a dedicated Admin resource, similar to the Admin resource above.
-        This Admin is used to create FLOAT Events, mint and distribute FLOAT NFTs based on the Event created. The Admin also manages the Events (create
-        and delete them)
-    */
-    pub resource floatAdmin {
-        /*
-            Wrapper for the Float Event Resource creation
-            input:
-                name: String - Name of the event
-                description: String - Description of the event
-                extraMetadata: {String: AnyStruct} - A String key based dictionary with extra metadata do add to event
-                image: String - A base64 encoded image, provided as a String
-                url: String - The URL of the event
-                verifiers: {String: [{FLOAT.IVerifier}]} - Check the FLOATVerifiers.cdc contract for details of this parameter. It allows to set time limits for claimability,
-                passwords, etc to claim FLOATs associated to the event
-
-            output: UInt64 - A Float Event Resource ID for future reference, since the resource itself gets saved in the internal dictionary.
-        */
-
-    }
-
     //------------------------------------------------------------------------------
     
     //------------ CONTRACT FUNCTIONS ----------------------------------------------
@@ -858,7 +919,10 @@ pub contract Shapes {
 
     // The usual function to create an empty collection
     pub fun createEmptyCollection(): @Shapes.Collection {
-        return <- create Collection()
+        let newCollection: @Shapes.Collection <- create Collection()
+        // Emit the event
+        emit CollectionCreated(to: newCollection.owner?.address)
+        return <- newCollection
     }
 
     // Functions to retrieve all the IDs for a given shape
@@ -910,6 +974,21 @@ pub contract Shapes {
         return returnDictionary
     }
 
+    /*
+        Function that returns the price of a Square, for purchase purposes, or nil if there are no Squares left to buy
+    */
+    pub fun getSquarePrice(): UFix64? {
+        let availableSquares: [UInt64] = Shapes.getAllSquareIDs()
+        if (availableSquares.length == 0) {
+            return nil
+        }
+        else {
+            let squarePrice: UFix64 = (&Shapes.ownedSquares[availableSquares[0]] as &Shapes.Square?)!.price
+
+            return squarePrice
+        }
+    }
+
     // ------------------------------------------------------------------------------
     
 
@@ -958,21 +1037,45 @@ pub contract Shapes {
         self.collectionStorage = /storage/ShapeCollection
         self.collectionPublic = /public/ShapeCollection
 
-        self.adminStorage = /storage/AdminStorage
-        self.adminPrivate = /private/AdminStorage
+        self.adminStorage = /storage/ShapeAdmin
+        self.adminPublic = /public/ShapeAdmin
+        self.adminPrivate = /private/ShapeAdmin
+
+        self.flowVaultStorage = /storage/flowVault
+        self.flowVaultPublic = /public/flowVault
 
         if (self.devMode) {
             let randomAdmin: @AnyResource <- self.account.load<@AnyResource>(from: self.adminStorage)
             destroy randomAdmin
 
+            self.account.unlink(self.adminPublic)
             self.account.unlink(self.adminPrivate)
         }
 
         // Create, save and link an Admin resource to the private storage
-        let admin: @Shapes.Admin <- create Admin()
+        let adminRef: &Shapes.Admin? = self.account.borrow<&Shapes.Admin>(from: Shapes.adminStorage)
+        
+        if (adminRef == nil) {
+            let admin: @Shapes.Admin <- create Admin()
+            self.account.save(<- admin, to: self.adminStorage)
 
-        self.account.save(<- admin, to: self.adminStorage)
-        self.account.link<&Shapes.Admin>(self.adminPrivate, target: self.adminStorage)
+            // Relink the capability
+            self.account.unlink(self.adminPublic)
+            self.account.link<&Shapes.Admin{Shapes.AdminPublic}>(self.adminPublic, target: self.adminStorage)
+
+            self.account.unlink(self.adminPrivate)
+            self.account.link<&Shapes.Admin>(self.adminPrivate, target: self.adminStorage)
+        }
+        else {
+            // Check if the capability is OK
+            let adminCap: Capability<&Shapes.Admin{Shapes.AdminPublic}> = self.account.getCapability<&Shapes.Admin{Shapes.AdminPublic}>(Shapes.adminPublic)
+
+            if (!adminCap.check()) {
+                // Re-link the capability
+                self.account.link<&Shapes.Admin{Shapes.AdminPublic}>(Shapes.adminPublic, target: Shapes.adminStorage)
+                self.account.link<&Shapes.Admin>(Shapes.adminPrivate, target: Shapes.adminStorage)
+            }
+        }
 
         // Admin is ready. Emit the event to notify people
         emit self.AdminReady()
@@ -983,13 +1086,45 @@ pub contract Shapes {
             let randomFloatEventsCollection: @AnyResource <- self.account.load<@AnyResource>(from: FLOAT.FLOATEventsStoragePath)
             destroy randomFloatEventsCollection
 
-            self.account.unlink(FLOAT.FLOATEventsPrivatePath)
             self.account.unlink(FLOAT.FLOATEventsPublicPath)
         }
 
-        let floatEvents: @FLOAT.FLOATEvents <- FLOAT.createEmptyFLOATEventCollection()
-        self.account.save(<- floatEvents, to: FLOAT.FLOATEventsStoragePath)
-        self.account.link<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPrivatePath, target: FLOAT.FLOATEventsStoragePath)
+        // The FLOAT stuff get initialized with this contract init function
+        let floatEventsRef: &FLOAT.FLOATEvents? = self.account.borrow<&FLOAT.FLOATEvents>(from: FLOAT.FLOATEventsStoragePath)
+
+        if (floatEventsRef == nil) {
+            let floatEvents: @FLOAT.FLOATEvents <- FLOAT.createEmptyFLOATEventCollection()
+            emit self.FLOATEventsCreated(in: self.account.address)
+            
+
+            // Create the group
+            let groupName: String = "Wolfstars"
+            let image: String = "https://ipfs.io/ipfs/QmbxVi3HqTMZjA9c7L5spGDLWTBsFuawrKiiQGHwzjh59A?filename=noobs2flowstars_logo.png"
+            let description: String = "Noobs to Flowstars creators"
+
+            floatEvents.createGroup(groupName: groupName, image: image, description: description)
+            emit self.FLOATEventsGroupCreated(groupName: groupName)
+
+            // Save the FloatEvents to storage
+            self.account.save(<- floatEvents, to: FLOAT.FLOATEventsStoragePath)
+            
+            // The FLOAT Events are always linked to the Public storage. Teoretically, this means that any person can mint a FLOAT so that's why
+            // they are setup with verifiers, such as mint limit, passwords, etc.
+            self.account.link<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPublicPath, target: FLOAT.FLOATEventsStoragePath)
+
+        }
+
+        // And now the FlowToken vault
+        let flowVaultRef: &FlowToken.Vault? = self.account.borrow<&FlowToken.Vault>(from: Shapes.flowVaultStorage)
+
+        if (flowVaultRef == nil) {
+            let flowVault: @FungibleToken.Vault <- FlowToken.createEmptyVault()
+            self.account.save(<- flowVault, to: Shapes.flowVaultStorage)
+
+            self.account.link<&FlowToken.Vault{FungibleToken.Receiver}>(Shapes.flowVaultPublic, target: Shapes.flowVaultStorage)
+
+            emit FlowVaultCreated()
+        }
 
         // ----------------------- SHAPE NFT MINT ------------------------------------------
         // All NFTs are going to be mint into the contract dictionaries
