@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { questions } from "./components/Questions"
+import { questions } from "./components/Questions"
 import * as fcl from "@onflow/fcl";
 import "./flow/config.js"
 import styles from "./styles/nav.css"
@@ -20,7 +21,15 @@ function App() {
 	const [currentQuestion, setCurrentQuestion] = useState(0);
 	const [showScore, setShowScore] = useState(false);
 	const [score, setScore] = useState(0);
+
+	const [question_level, setQuestionLevel] = useState(0)
+	const [current_questions, setQuestionSet] = useState(questions[question_level])
+	const [currentQuestion, setCurrentQuestion] = useState(0);
+	const [showScore, setShowScore] = useState(false);
+	const [score, setScore] = useState(0);
 	const [user, setUser] = useState({ loggedIn: false });
+	const shapeContractAddr = '0xb7fb1e0ae6485cf6'
+	const floatEventIds = [136770190, 136770191, 136770192, 136770193, 136770194]
 	const shapeContractAddr = '0xb7fb1e0ae6485cf6'
 	const floatEventIds = [136770190, 136770191, 136770192, 136770193, 136770194]
 
@@ -170,6 +179,19 @@ function App() {
 			colStatus ? alert("Account " + user.addr + " already has a FLOAT Collection") : createFLOATCollection()
 		})
 	}
+    }
+
+	async function resolveShapeCollection() {
+		await getShapeCollectionStatus().then((colStatus) => {
+			colStatus ? alert("Account " + user.addr + " already has a Shape Collection") : createShapeCollection()
+		})
+	}
+
+	async function resolveFLOATCollection() {
+		await getFLOATCollectionExists().then((colStatus) => {
+			colStatus ? alert("Account " + user.addr + " already has a FLOAT Collection") : createFLOATCollection()
+		})
+	}
 
     function logOffUser() {
         if (user.loggedIn) {
@@ -183,6 +205,7 @@ function App() {
 		}
 
 		const nextQuestion = currentQuestion + 1;
+		if (nextQuestion < current_questions.length) {
 		if (nextQuestion < current_questions.length) {
 			setCurrentQuestion(nextQuestion);
 		} else {
@@ -273,7 +296,12 @@ function App() {
 				{user.loggedIn ? (
 					showScore ? (
 						<Score />
+						<Score />
 					) : (
+						<Quiz />
+					)
+				) : (
+					<div className='score-section'>Log in and get your Collections to play the quiz</div>
 						<Quiz />
 					)
 				) : (

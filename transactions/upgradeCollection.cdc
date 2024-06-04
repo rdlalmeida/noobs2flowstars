@@ -14,7 +14,7 @@ transaction(accountToUpgrade: Address) {
         self.collectionRef = getAccount(accountToUpgrade).getCapability<&Shapes.Collection>(Shapes.collectionPublic).borrow() ??
             panic("Account ".concat(accountToUpgrade.toString()).concat(" does not has a Collection set yet!"))
 
-        self.adminRef = signer.getCapability<&Shapes.Admin>(Shapes.adminPrivate).borrow() ??
+        self.adminRef = signer.getCapability<&Shapes.Admin>(Shapes.adminPublic).borrow() ??
             panic("Admin account ".concat(signer.address.toString()).concat(" does not has a Admin resource configured yet!"))
     }
 

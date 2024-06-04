@@ -5,19 +5,19 @@ EMULATOR_ADDRESS="0xf8d6e0586b0a20c7"
 EMULATOR="emulator-account"
 
 ACCOUNT01_ADDRESS="0x045a1763c93006ca"
-ACCOUNT01=account01
+ACCOUNT01="account01"
 
-ACCOUNT02_ADDRESS="0x120e725050340cab"
+ACCOUNT02_ADDRESS="0x01cf0e2f2f715450"
 ACCOUNT02="account02"
 
-ACCOUNT03_ADDRESS="0xf669cb8d41ce0c74"
+ACCOUNT03_ADDRESS="0x179b6b1cb6755e31"
 ACCOUNT03="account03"
 
-ACCOUNT04_ADDRESS="0x192440c99cb17282"
+ACCOUNT04_ADDRESS="0xf3fcd2c1a78f5eee"
 ACCOUNT04="account04"
 
-ACCOUNT05_ADDRESS="0xfd43f9148d4b725d"
-ACCOUNT05=account05
+ACCOUNT05_ADDRESS="0xe03daebed8ca0615"
+ACCOUNT05="account05"
 
 # The base path to the transaction folder to execute.
 # NOTE: For this to work properly (because of the transaction imports mainly), this Path has to be relative to the folder where this script resides
@@ -25,14 +25,14 @@ TRANSACTIONS_BASE_PATH=./transactions/
 
 # And now an array with all the transactions .cdc files to be executed
 transactions_to_execute=(
-    "createUserCollection.cdc"
-    "createUserCollection.cdc"
-    "createUserCollection.cdc"
-    "jumpStartCollection.cdc"
-    "jumpStartCollection.cdc"
-    "jumpStartCollection.cdc"
-    "createFLOATEventGroup.cdc"
-    "createFloatEvent.cdc"
+    "createUserCollection.cdc" 
+    "createUserCollection.cdc" 
+    "createFLOATEventGroup.cdc" 
+    "createFloatEvent.cdc" 
+    "createFloatEvent.cdc" 
+    "createFloatEvent.cdc" 
+    "createEmptyFlowVault.cdc" 
+    "mintTestFlowToVault.cdc" 
 )
 
 # This next array has all the arguments that each transaction may need. This array NEEDS to match the size of the previous one. If a transaction in the previous
@@ -44,24 +44,29 @@ transactions_to_execute=(
 transaction_arguments=(
     "" 
     "" 
+    "'WolfStars' 'https://ipfs.io/ipfs/QmbxVi3HqTMZjA9c7L5spGDLWTBsFuawrKiiQGHwzjh59A?filename=noobs2flowstars_logo.png' 'Noobs to Flowstars creators'" 
+    "'Learning01' 'Learning event #1' 'https://ipfs.io/ipfs/QmcWpR9KfPfefGBoTSZwY4V7nVN2bSPdJ6PS7bC6BAP95D?filename=noobs2flowstars_logo2.png' 'www.noobs2flowstars.io' [] [] {}"
+    "'Learning02' 'Learning event #2' 'https://ipfs.io/ipfs/QmcWpR9KfPfefGBoTSZwY4V7nVN2bSPdJ6PS7bC6BAP95D?filename=noobs2flowstars_logo2.png' 'www.noobs2flowstars.io' [] [] {}"
+    "'Learning03' 'Learning event #3' 'https://ipfs.io/ipfs/QmcWpR9KfPfefGBoTSZwY4V7nVN2bSPdJ6PS7bC6BAP95D?filename=noobs2flowstars_logo2.png' 'www.noobs2flowstars.io' [] [] {}" 
     "" 
-    ${ACCOUNT01_ADDRESS} 
-    ${ACCOUNT02_ADDRESS} 
-    ${ACCOUNT03_ADDRESS} 
-    "'WolfStars' 'None' 'Noobs to Flowstars creators'" 
-    "'Learning01' 'Learning event #1' 'None' 'www.noobs2flowstars.io' [] [] {}")
+    "${ACCOUNT01_ADDRESS} '/public/flowVault' 123.34" 
+    )
 
 # Another array with the signers to use in each transaction. These are always mandatory
 transactions_signers=(
     ${ACCOUNT01} 
     ${ACCOUNT02} 
-    ${ACCOUNT03} 
     ${EMULATOR} 
     ${EMULATOR} 
     ${EMULATOR} 
-    ${EMULATOR}
+    ${EMULATOR} 
+    ${ACCOUNT01} 
     ${EMULATOR}
     )
+
+# echo "Transactions to execute = ${#transactions_to_execute[*]}"
+# echo "Transaction arguments = ${#transaction_arguments[*]}"
+# echo "Transaction signers = ${#transaction_signers[*]}"
 
 # Validate all arrays at this point
 if [ ${#transactions_to_execute[*]} != ${#transaction_arguments[*]} ]; then

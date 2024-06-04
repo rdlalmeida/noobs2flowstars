@@ -15,6 +15,8 @@
 import FLOAT from "../../float/src/cadence/float/FLOAT.cdc"
 import FlowToken from "../../float/src/cadence/core-contracts/FlowToken.cdc"
 import FungibleToken from "../../float/src/cadence/core-contracts/FungibleToken.cdc"
+import FlowToken from "../../float/src/cadence/core-contracts/FlowToken.cdc"
+import FungibleToken from "../../float/src/cadence/core-contracts/FungibleToken.cdc"
 
 pub contract Shapes {
 
@@ -54,7 +56,12 @@ pub contract Shapes {
     // Shape admin storage and private
     pub let adminStorage: StoragePath
     pub let adminPublic: PublicPath
+    pub let adminPublic: PublicPath
     pub let adminPrivate: PrivatePath
+
+    // Storage paths for the FlowToken Vault
+    pub let flowVaultStorage: StoragePath
+    pub let flowVaultPublic: PublicPath
 
     // Storage paths for the FlowToken Vault
     pub let flowVaultStorage: StoragePath
@@ -108,8 +115,20 @@ pub contract Shapes {
     // Event emited when a Group is created into a FLOAT events
     pub event FLOATEventsGroupCreated(groupName: String)
 
+    // Event emited when the Float Events Resource is created
+    pub event FLOATEventsCreated(in: Address)
+
+    // Event emited when a Group is created into a FLOAT events
+    pub event FLOATEventsGroupCreated(groupName: String)
+
     // Event emited when the Admin Resource is created, saved and linked to the private storage
     pub event AdminReady()
+
+    // Event emited when the Flow Vault is created, saved and linked (the receiver)
+    pub event FlowVaultCreated()
+
+    // Event emited when a Square is bought
+    pub event SquareBought(squareId: UInt64, owner: Address?)
 
     // Event emited when the Flow Vault is created, saved and linked (the receiver)
     pub event FlowVaultCreated()
@@ -288,11 +307,18 @@ pub contract Shapes {
         pub let score: UInt64
         pub let nftCount: UInt64
         pub let price: UFix64
+        pub let price: UFix64
 
         init(count: UInt64) {
             self.id = self.uuid
             self.score = 1
             self.nftCount = count
+            if (Shapes.devMode) {
+                self.price = 50.0
+            }
+            else {
+                self.price = 0.5
+            }
             if (Shapes.devMode) {
                 self.price = 50.0
             }
@@ -621,6 +647,7 @@ pub contract Shapes {
         Another approach was to create a Admin Collection that could store multiple NFTs as opposed to the user ones.
     */
     pub resource Admin: AdminPublic {
+    pub resource Admin: AdminPublic {
         /*
             The most important functions here are the deposit and withdraw functions
             As with most up to here, the deposit function is actually a series of deposit functions, one per shape, to keep it simple, believe it or not
@@ -630,6 +657,45 @@ pub contract Shapes {
             input: collectionRef: &Shapes.Collection - A reference to a collection to where the shape is going to be deposited to.
             output: Void. If the pre-condition is not triggered, the function is successful
         */
+
+        /*
+            Function to buy a Square from the internal collection using Flow.
+            input:
+                recipient: &Collection - A reference to the Collection where the Square is to be deposited after purchase
+                payment: @FlowToken.Vault - A Vault Resource with enough token to perform the purchase
+            output: UInt64 - If the purchase is successful, the id of the Square bought is returned
+        */
+        pub fun buySquare(recipient: &Collection, payment: @FungibleToken.Vault): UInt64 {
+            // Get a reference to Shapes contract's Flow Vault
+            let flowVaultReceiverRef: &FlowToken.Vault{FungibleToken.Receiver} = 
+            Shapes.account.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(Shapes.flowVaultPublic).borrow() ??
+                panic("There is no FlowToken.Vault available to receive the payment!")
+
+            // Validate that the Vaults are from the same type, i.e., the contain the same type of tokens
+            assert(
+                payment.getType() == flowVaultReceiverRef.getType(),
+                message: "Mismatch between the payment provided ("
+                    .concat(payment.getType().identifier)
+                    .concat(") and the expected token type to pay ("
+                    .concat(flowVaultReceiverRef.getType().identifier)
+                    .concat("). Unable to process payment")
+                )
+            )
+
+            // Perform the payment
+            flowVaultReceiverRef.deposit(from: <- payment)
+
+            // Payment concluded. Deposit a Square into the user's Collection
+
+            let purchasedSquareId: UInt64 = self.depositSquare(collectionRef: recipient)
+
+            // Emit the event
+            emit SquareBought(squareId: purchasedSquareId, owner: self.owner?.address)
+
+            return purchasedSquareId
+        }
+        
+        pub fun depositSquare(collectionRef: &Shapes.Collection): UInt64 {
 
         /*
             Function to buy a Square from the internal collection using Flow.
@@ -679,9 +745,12 @@ pub contract Shapes {
             collectionRef.depositSquare(square: <- squareToDeposit)
 
             return collectionRef.mySquare[0].id
+
+            return collectionRef.mySquare[0].id
         }
 
         // The remaining ones are the same
+        pub fun depositTriangle(collectionRef: &Shapes.Collection): UInt64 {
         pub fun depositTriangle(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedTriangles.length != 0: "There are no Triangles left to deposit! Cannot continue!"
@@ -691,8 +760,11 @@ pub contract Shapes {
             collectionRef.depositTriangle(triangle: <- triangleToDeposit)
 
             return collectionRef.myTriangle[0].id
+
+            return collectionRef.myTriangle[0].id
         }
 
+        pub fun depositPentagon(collectionRef: &Shapes.Collection): UInt64 {
         pub fun depositPentagon(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedPentagons.length != 0: "There are no Pentagons left to deposit! Cannot continue!"
@@ -702,8 +774,11 @@ pub contract Shapes {
             collectionRef.depositPentagon(pentagon: <- pentagonToDeposit)
 
             return collectionRef.myPentagon[0].id
+
+            return collectionRef.myPentagon[0].id
         }
 
+        pub fun depositCircle(collectionRef: &Shapes.Collection): UInt64 {
         pub fun depositCircle(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedCircles.length != 0: "There are no Circles left to deposit! Cannot continue!"
@@ -713,8 +788,11 @@ pub contract Shapes {
             collectionRef.depositCircle(circle: <- circleToDeposit)
 
             return collectionRef.myCircle[0].id
+
+            return collectionRef.myCircle[0].id
         }
 
+        pub fun depositStar(collectionRef: &Shapes.Collection): UInt64 {
         pub fun depositStar(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 Shapes.ownedStars.length != 0: "There are no Stars left to deposit! Cannot continue!"
@@ -722,6 +800,8 @@ pub contract Shapes {
 
             let starToDeposit: @Shapes.Star <- Shapes.ownedStars.remove(key: Shapes.getAllStarIDs().removeFirst())!
             collectionRef.depositStar(star: <- starToDeposit)
+
+            return collectionRef.myStar[0].id
 
             return collectionRef.myStar[0].id
         }
@@ -805,9 +885,11 @@ pub contract Shapes {
             
             input: &Shapes.Collection - a reference for a user Collection
             output: UInt64 - returns the ID of the shape that it was upgraded to
+            output: UInt64 - returns the ID of the shape that it was upgraded to
 
             The function does not returns anything. As usual, pre and post conditions are used to prevent illegal operations
         */
+        pub fun upgradeCollection(collectionRef: &Shapes.Collection): UInt64 {
         pub fun upgradeCollection(collectionRef: &Shapes.Collection): UInt64 {
             pre {
                 // One single pre condition should be enough to detect if a collection is upgradable: check if the Square, Triangle, Pentagon and Circle are all empty
@@ -833,6 +915,8 @@ pub contract Shapes {
 
                 // Return the id of the upgraded shape
                 return collectionRef.myTriangle[0].id
+                // Return the id of the upgraded shape
+                return collectionRef.myTriangle[0].id
             }
 
             // The rest is more of the same
@@ -846,6 +930,7 @@ pub contract Shapes {
                 emit Shapes.CollectionUpgraded(from: "Triangle", to: "Pentagon", account: self.owner?.address)
 
                 return collectionRef.myPentagon[0].id
+                return collectionRef.myPentagon[0].id
             }
 
             if (collectionRef.myPentagon.length != 0) {
@@ -858,6 +943,7 @@ pub contract Shapes {
                 emit Shapes.CollectionUpgraded(from: "Pentagon", to: "Circle", account: self.owner?.address)
 
                 return collectionRef.myCircle[0].id
+                return collectionRef.myCircle[0].id
             }
 
             // The last case is the default. There's no need to do an if here
@@ -868,6 +954,7 @@ pub contract Shapes {
             self.depositStar(collectionRef: collectionRef)
 
             emit Shapes.CollectionUpgraded(from: "Circle", to: "Star", account: self.owner?.address)
+            return collectionRef.myStar[0].id
             return collectionRef.myStar[0].id
         }
 
@@ -919,6 +1006,10 @@ pub contract Shapes {
 
     // The usual function to create an empty collection
     pub fun createEmptyCollection(): @Shapes.Collection {
+        let newCollection: @Shapes.Collection <- create Collection()
+        // Emit the event
+        emit CollectionCreated(to: newCollection.owner?.address)
+        return <- newCollection
         let newCollection: @Shapes.Collection <- create Collection()
         // Emit the event
         emit CollectionCreated(to: newCollection.owner?.address)
@@ -989,12 +1080,27 @@ pub contract Shapes {
         }
     }
 
+    /*
+        Function that returns the price of a Square, for purchase purposes, or nil if there are no Squares left to buy
+    */
+    pub fun getSquarePrice(): UFix64? {
+        let availableSquares: [UInt64] = Shapes.getAllSquareIDs()
+        if (availableSquares.length == 0) {
+            return nil
+        }
+        else {
+            let squarePrice: UFix64 = (&Shapes.ownedSquares[availableSquares[0]] as &Shapes.Square?)!.price
+
+            return squarePrice
+        }
+    }
+
     // ------------------------------------------------------------------------------
     
 
     init() {
         // Set the state of the Development right at the beginning
-        self.devMode = true
+        self.devMode = false
 
         // Initialize the counting variables to 0
         self.totalSupply = 0
@@ -1043,16 +1149,46 @@ pub contract Shapes {
 
         self.flowVaultStorage = /storage/flowVault
         self.flowVaultPublic = /public/flowVault
+        self.adminStorage = /storage/ShapeAdmin
+        self.adminPublic = /public/ShapeAdmin
+        self.adminPrivate = /private/ShapeAdmin
+
+        self.flowVaultStorage = /storage/flowVault
+        self.flowVaultPublic = /public/flowVault
 
         if (self.devMode) {
             let randomAdmin: @AnyResource <- self.account.load<@AnyResource>(from: self.adminStorage)
             destroy randomAdmin
 
             self.account.unlink(self.adminPublic)
+            self.account.unlink(self.adminPublic)
             self.account.unlink(self.adminPrivate)
         }
 
         // Create, save and link an Admin resource to the private storage
+        let adminRef: &Shapes.Admin? = self.account.borrow<&Shapes.Admin>(from: Shapes.adminStorage)
+        
+        if (adminRef == nil) {
+            let admin: @Shapes.Admin <- create Admin()
+            self.account.save(<- admin, to: self.adminStorage)
+
+            // Relink the capability
+            self.account.unlink(self.adminPublic)
+            self.account.link<&Shapes.Admin{Shapes.AdminPublic}>(self.adminPublic, target: self.adminStorage)
+
+            self.account.unlink(self.adminPrivate)
+            self.account.link<&Shapes.Admin>(self.adminPrivate, target: self.adminStorage)
+        }
+        else {
+            // Check if the capability is OK
+            let adminCap: Capability<&Shapes.Admin{Shapes.AdminPublic}> = self.account.getCapability<&Shapes.Admin{Shapes.AdminPublic}>(Shapes.adminPublic)
+
+            if (!adminCap.check()) {
+                // Re-link the capability
+                self.account.link<&Shapes.Admin{Shapes.AdminPublic}>(Shapes.adminPublic, target: Shapes.adminStorage)
+                self.account.link<&Shapes.Admin>(Shapes.adminPrivate, target: Shapes.adminStorage)
+            }
+        }
         let adminRef: &Shapes.Admin? = self.account.borrow<&Shapes.Admin>(from: Shapes.adminStorage)
         
         if (adminRef == nil) {
@@ -1089,6 +1225,42 @@ pub contract Shapes {
             self.account.unlink(FLOAT.FLOATEventsPublicPath)
         }
 
+        // The FLOAT stuff get initialized with this contract init function
+        let floatEventsRef: &FLOAT.FLOATEvents? = self.account.borrow<&FLOAT.FLOATEvents>(from: FLOAT.FLOATEventsStoragePath)
+
+        if (floatEventsRef == nil) {
+            let floatEvents: @FLOAT.FLOATEvents <- FLOAT.createEmptyFLOATEventCollection()
+            emit self.FLOATEventsCreated(in: self.account.address)
+            
+
+            // Create the group
+            let groupName: String = "Wolfstars"
+            let image: String = "https://ipfs.io/ipfs/QmbxVi3HqTMZjA9c7L5spGDLWTBsFuawrKiiQGHwzjh59A?filename=noobs2flowstars_logo.png"
+            let description: String = "Noobs to Flowstars creators"
+
+            floatEvents.createGroup(groupName: groupName, image: image, description: description)
+            emit self.FLOATEventsGroupCreated(groupName: groupName)
+
+            // Save the FloatEvents to storage
+            self.account.save(<- floatEvents, to: FLOAT.FLOATEventsStoragePath)
+            
+            // The FLOAT Events are always linked to the Public storage. Teoretically, this means that any person can mint a FLOAT so that's why
+            // they are setup with verifiers, such as mint limit, passwords, etc.
+            self.account.link<&FLOAT.FLOATEvents>(FLOAT.FLOATEventsPublicPath, target: FLOAT.FLOATEventsStoragePath)
+
+        }
+
+        // And now the FlowToken vault
+        let flowVaultRef: &FlowToken.Vault? = self.account.borrow<&FlowToken.Vault>(from: Shapes.flowVaultStorage)
+
+        if (flowVaultRef == nil) {
+            let flowVault: @FungibleToken.Vault <- FlowToken.createEmptyVault()
+            self.account.save(<- flowVault, to: Shapes.flowVaultStorage)
+
+            self.account.link<&FlowToken.Vault{FungibleToken.Receiver}>(Shapes.flowVaultPublic, target: Shapes.flowVaultStorage)
+
+            emit FlowVaultCreated()
+        }
         // The FLOAT stuff get initialized with this contract init function
         let floatEventsRef: &FLOAT.FLOATEvents? = self.account.borrow<&FLOAT.FLOATEvents>(from: FLOAT.FLOATEventsStoragePath)
 
